@@ -5,18 +5,20 @@ const HeadLen = 4
 const SaltLen = 40 // {0, 1}^320
 const SeedLen = 56
 
-//the degree is provided logarithmically as the 'LOGN' parameter: LOGN ranges from 1 to 10, and represents the degree 2^LOGN.
-//use :
-//	  LOGN=9 for Falcon-512
-//	  LOGN=10 for Falcon-1024
-//Valid values for LOGN range from 1 to 10
-//(values 1 to 8 correspond to reduced variants of Falcon that do not
-//provided adequate security and are meant for research purposes only).
+// the degree is provided logarithmically as the 'LOGN' parameter: LOGN ranges from 1 to 10, and represents the degree 2^LOGN.
+// use :
 //
-//The sizes are provided as macros that evaluate to constant
-//expressions, as long as the 'LOGN' parameter is itself a constant
-//expression. Moreover, all sizes are monotonic (for each size category,
-//increasing LOGN cannot result in a shorter length).
+//	LOGN=9 for Falcon-512
+//	LOGN=10 for Falcon-1024
+//
+// Valid values for LOGN range from 1 to 10
+// (values 1 to 8 correspond to reduced variants of Falcon that do not
+// provided adequate security and are meant for research purposes only).
+//
+// The sizes are provided as macros that evaluate to constant
+// expressions, as long as the 'LOGN' parameter is itself a constant
+// expression. Moreover, all sizes are monotonic (for each size category,
+// increasing LOGN cannot result in a shorter length).
 var LOGN = map[uint16]uint8{
 	2:    1,
 	4:    2,

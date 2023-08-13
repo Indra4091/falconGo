@@ -241,5 +241,8 @@ func TestGenPoly(t *testing.T) {
 }
 
 func TestNtruGen(t *testing.T) {
-	t.Skip()
+	var f, g, F, G []int16
+	var n uint16 = 64
+	f, g, F, G = NtruGen(n)
+	log.Println(f,g,F,G)
 }

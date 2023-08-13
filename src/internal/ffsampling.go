@@ -5,7 +5,6 @@ import (
 	"math"
 
 	"github.com/realForbis/go-falcon-WIP/src/internal/transforms/fft"
-	"github.com/realForbis/go-falcon-WIP/src/util"
 )
 
 /*
@@ -32,7 +31,7 @@ type CoeffTree struct {
 
 func Gram(B [][][]float64) [][][]float64 {
 	/*Compute the Gram matrix of B
-	args: B (matrix
+	args: B (matrix)
 	format: coefficient
 	made changes due to test failing*/
 
@@ -61,6 +60,7 @@ func Gram(B [][][]float64) [][][]float64 {
 /*
 // Compute the LDL decomposition of G. Only works with 2 * 2 matrixes.
 // Format: coefficient
+
 func Ldl(G [][][]float64) [][][][]float64 {
 	deg := len(G[0][0])
 	dim := len(G)
@@ -244,11 +244,15 @@ func FfnpFFT(t [][]complex128, T []interface{}) [][]complex128 {
 // 12: z0 ← ffSampling n/2(t0, T0)
 // 13: z0 ← mergefft(z0)
 // 14: return z = (z0, z1)
+
+//FAIL: TestFfSamplingFFT
+
 func (T *FFTtree) FfSamplingFFT(t [][]complex128, sigmin float64) [][]complex128 {
+	//gives an error bruh
 	n := len(t[0]) * fftRatio
 	z := [][]complex128{{0 + 0i}, {0 + 0i}}
-	var rb [9]byte
-	util.RandomBytes(rb[:])
+	//var rb [9]byte
+	//util.RandomBytes(rb[:]) //where is this rb used bruh??
 	if n > 1 {
 		z[1] = fft.MergeFFT((*T).FfSamplingFFT(fft.SplitFFT(t[1]), sigmin))
 		t0b := fft.AddFFT(t[0], fft.MulFFT(fft.SubFFT(t[1], z[1]), T.Value))
@@ -257,11 +261,11 @@ func (T *FFTtree) FfSamplingFFT(t [][]complex128, sigmin float64) [][]complex128
 		return z
 	} else if n == 1 {
 		log.Println("real(t[0][0])", real(t[0][0]))
-		if T.Leftchild[:] == nil {
+		/*if T.Leftchild[:] == nil {
 			T.Leftchild = T.Rightchild
-		}
-		z[0] = []complex128{complex(float64(Samplerz(real(t[0][0]), real(T.Leftchild[0]), sigmin)), 0)}
-		z[1] = []complex128{complex(float64(Samplerz(real(t[1][0]), real(T.Leftchild[0]), sigmin)), 0)}
+		}*/
+		z[0] = []complex128{complex(float64(Samplerz(real(t[0][0]), real(T.Value[0]), sigmin)), 0)}
+		z[1] = []complex128{complex(float64(Samplerz(real(t[1][0]), real(T.Value[0]), sigmin)), 0)}
 		log.Println("z", z)
 		return z
 	}

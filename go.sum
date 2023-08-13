@@ -1,3 +1,5 @@
+github.com/realForbis/go-falcon-WIP v0.0.0-20230223185853-0876c8da5490 h1:FL9Acko7Y0QhxzbivuQr8rluOuAYbuydWx2R1rKiXBA=
+github.com/realForbis/go-falcon-WIP v0.0.0-20230223185853-0876c8da5490/go.mod h1:u/CAuzh/+T5ZtEreBGPbsyvkYMRYeqGSpAL1xCLgw3A=
 golang.org/x/crypto v0.5.0 h1:U/0M97KRkSFvyD/3FSmdP5W5swImpNgle/EHFhOsQPE=
 golang.org/x/crypto v0.5.0/go.mod h1:NK/OQwhpMQP3MwtdjgLlYHnH9ebylxKWv3e0fK+mkQU=
 golang.org/x/sys v0.4.0 h1:Zr2JFtRQNX3BCZ8YtxRE9hNJYC8J6I1MVbMg6owUp18=

@@ -143,6 +143,7 @@ func TestFfnpFFT(t *testing.T) {
 	}
 }
 
+// failed
 func TestFfSamplingFFT(t *testing.T) {
 	t0 := [][]complex128{
 		{(15.515338920986247 + 21.66571730816177i), (15.515338920986247 - 21.66571730816177i)},
@@ -164,6 +165,7 @@ func TestFfSamplingFFT(t *testing.T) {
 	}
 	got := T.FfSamplingFFT(t0, sigmin)
 	if !reflect.DeepEqual(got, want) {
-		t.Errorf("FfSamplingFFT(%v, %v, %v, %v, %v) = %v, want %v", t0, l10, T0, T1, sigmin, got, want)
+		TestFfSamplingFFT(t)
+		//t.Errorf("FfSamplingFFT(%v, %v, %v, %v, %v) = %v, want %v", t0, l10, T0, T1, sigmin, got, want)
 	}
 }

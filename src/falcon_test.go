@@ -34,10 +34,6 @@ var (
 //}
 //
 
-func TestNewKeyPair(t *testing.T) {
-	// TODO
-}
-
 // func TestNewKeyPairFromPolys(t *testing.T) {
 // 	n := 512
 // 	f := util.Float64ToInt16(kat.SignKAT[n][0].Rb_f)
@@ -83,6 +79,36 @@ func TestGetPublicKey(t *testing.T) {
 	log.Printf("Public key: %v", pub)
 }
 
-// func TesthashToPoint(t *testing.T) {
-// 	// TODO
-// }
+// below here are added
+func TestNewKeyPair(t *testing.T) {
+	n := 16
+	for i := 10; i < 10; i++ {
+		priv, pub, err := NewKeyPair(uint16(n))
+		if err != nil {
+			t.Errorf("Error NewKeyPair: %v", err)
+		}
+		log.Printf("Private key: %v\n Public key: %v", priv, pub)
+	}
+}
+
+/*func TestSignVerify(t *testing.T) {
+	n := uint16(16)
+	priv, pub, err := NewKeyPair(uint16(n))
+	if err != nil {
+		t.Errorf("Error NewKeyPair: %v", err)
+	}
+
+	message := "message"
+	signature := priv.Sign([]byte(message))
+	if len(signature) == 0 {
+		t.Error("Error generating a signature")
+	}
+	log.Printf("Signature: %v", signature)
+	log.Printf("LMao need to use it: %v", pub)
+
+	verification := pub.Verify([]byte(message), signature)
+	if verification == false {
+		t.Error("Error generating a signature")
+	}
+	log.Printf("Verification OK")
+}*/

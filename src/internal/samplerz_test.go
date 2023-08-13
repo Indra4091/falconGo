@@ -1,30 +1,42 @@
 package internal
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/realForbis/go-falcon-WIP/src/util"
+)
 
 /*
 import (
+
 	"encoding/hex"
 	"testing"
+
 )
 
-func decodeHexString(hexString string) []byte {
-	byteSlice, err := hex.DecodeString(hexString)
-	if err != nil {
-		panic(err)
+	func decodeHexString(hexString string) []byte {
+		byteSlice, err := hex.DecodeString(hexString)
+		if err != nil {
+			panic(err)
+		}
+		return byteSlice
 	}
-	return byteSlice
-}
-
+*/
 func TestBaseSampler(t *testing.T) {
 	// Test that baseSampler returns a value in the expected range.
-	z0 := baseSampler()
-	if z0 < 0 || z0 > 18 {
-		t.Errorf("baseSampler returned a value outside the expected range: got %d, want [0, 18]", z0)
+	var data [9]byte
+	err := util.RandomBytes(data[:])
+	if err == nil {
+		z0 := BaseSampler(data)
+		if z0 < 0 || z0 > 18 {
+			t.Errorf("baseSampler returned a value outside the expected range: got %d, want [0, 18]", z0)
+		}
+	} else {
+		t.Errorf("error in generating random bytes")
 	}
 }
 
-
+/*
 func TestSamplerZ(t *testing.T) {
 	type vectors struct {
 		center            float64

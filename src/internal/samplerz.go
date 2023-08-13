@@ -73,7 +73,11 @@ var C = [13]uint64{
 // 4: z0 ← z0 + Ju < RCDT[i]K
 // 5: return z0
 // https://falcon-sign.info/falcon.pdf#57
-func baseSampler(randomBytes [RCDTprecLen]byte) int {
+
+//// RandomBytes fills the given byte slice with random bytes.
+
+func BaseSampler(randomBytes [RCDTprecLen]byte) int {
+	//check base sampler again no random library used
 	var z0 int
 	u := new(big.Int).SetBytes(randomBytes[:])
 	for _, elt := range RCDT {
@@ -96,6 +100,7 @@ func baseSampler(randomBytes [RCDTprecLen]byte) int {
 // 7: y ← (z · y) >> 63
 // 8: return y
 // https://falcon-sign.info/falcon.pdf#d0
+
 func approxexp(x, ccs float64) uint64 {
 	y := C[0]
 	// Since z is positive, int is equivalent to floor
@@ -121,6 +126,7 @@ func approxexp(x, ccs float64) uint64 {
 // 9: while ((w = 0) and (i > 0))
 // 10: return Jw < 0K ▷ Return 1 with probability 2−64 · z ≈ ccs · exp(−x)
 // https://falcon-sign.info/falcon.pdf#cf
+
 func berexp(x, ccs float64, randomBytes []byte) bool {
 	var w int
 	s := math.Floor(x * ILN2)
@@ -160,7 +166,7 @@ func Samplerz(mu, sigma, sigmin float64) int8 {
 	var tb []byte
 	for {
 		fb, sb, tb = generateAndSplitRandBytes()
-		z0 := baseSampler(fb)
+		z0 := BaseSampler(fb)
 		b := int(new(big.Int).SetBytes(sb[:]).Uint64())
 		b &= 1
 		z := float64(b + (2*b-1)*z0)

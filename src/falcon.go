@@ -108,7 +108,6 @@ func normalizeTree(tree [][]complex128, sigma float64) {
 	}
 }
 
-// class in python
 type PublicKey struct {
 	n uint16
 	h []int16
@@ -118,7 +117,6 @@ func NewPublicKey() *PublicKey {
 	return new(PublicKey)
 }
 
-// golang tip: GetPublicKey() is associated with privKey type
 func (privKey *PrivateKey) GetPublicKey() *PublicKey {
 	pubKey := NewPublicKey()
 	pubKey.n = privKey.n
