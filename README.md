@@ -1,4 +1,7 @@
 # go-falcon
-FALCON post-quantum cryptographic signature algorithm written in GO
+FALCON post-quantum cryptographic signature verification algorithm written in GO
 
-this repository is not finished and is still under active development, under no circumstances should it be used as a finished and secure library/repository!!!
+References to the following materials and repositories:
+- FALCON paper
+- mikeout/falcon
+- tprest/falcon.py

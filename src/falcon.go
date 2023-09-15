@@ -295,7 +295,7 @@ func (pubKey *PublicKey) hashToPoint(message []byte, salt []byte) []int16 {
 ///////////////////////////////////////////////////////////////////////////////
 
 // Sample a short vector s such that s[0] + s[1] * h = point.
-func (privKey *PrivateKey) samplePreImage(point []float64) [][]int16 {
+/*func (privKey *PrivateKey) samplePreImage(point []float64) [][]int16 {
 	PubParam := GetParamSet(privKey.n)
 	B0FFT, TFFT := basisAndMatrix(
 		privKey.f,
@@ -334,9 +334,9 @@ func (privKey *PrivateKey) samplePreImage(point []float64) [][]int16 {
 	s[0] = util.SubInt16(util.Float64ToInt16(point), v0)
 	s[1] = util.NegInt16(v1)
 	return s
-}
+}*/
 
-func (privKey *PrivateKey) Sign(message []byte) []byte {
+/*func (privKey *PrivateKey) Sign(message []byte) []byte {
 	PubParam := GetParamSet(privKey.n)
 	signature := []byte{byte(0x30 + LOGN[privKey.n])} // header
 	var salt [SaltLen]byte
@@ -365,64 +365,65 @@ func (privKey *PrivateKey) Sign(message []byte) []byte {
 			return signature
 		}
 	}
-
-}
+}*/
 
 func (pubKey *PublicKey) Verify(message []byte, signature []byte) bool {
+	//checking
+	fmt.Println("\npubKey as list: ", pubKey.h)
+	fmt.Println("\nsignature as list: ", signature)
+
 	salt := signature[HeadLen : HeadLen+SaltLen]
 	encS := signature[HeadLen+SaltLen:]
 	PubParam := GetParamSet(pubKey.n)
+
+	fmt.Println("\nsalt: ", salt)
+	fmt.Println("\nSaltLen: ", SaltLen)
+	fmt.Println("\nHeadLen: ", HeadLen)
+	fmt.Println("\nencS: ", encS)
+
 	var normSign uint32
 	var s1 []int16
 	// ss1 is dummy-array
 	ss1, err := internal.Decompress(encS, int(PubParam.sigbytelen-HeadLen-SaltLen), int(pubKey.n))
-	// check if the encoding is valid
+	//Decompress working fine
+
+	fmt.Println("\nsigPart s1: ", ss1)
+
 	if err != nil {
 		fmt.Println("invalid encoding")
 		return false
 	}
 
-	// type conversion
 	for i := 0; i < len(ss1); i++ {
-		s1[i] = int16(ss1[i])
+		s1 = append(s1, int16(ss1[i]))
 	}
 
 	// compute s0 and normalize its coefficients in (-q/2, q/2]
-	hashed := pubKey.hashToPoint(message, salt[:])
+	hashed := pubKey.hashToPoint(message, salt)
+	fmt.Println("\nhashed value: ", hashed)
+
 	s0 := ntt.SubZq(hashed, ntt.MulZq(s1, pubKey.h))
+	fmt.Println("\ns0 before normalization: ", s0)
+	fmt.Println("\nQ: ", util.Q)
 
 	for i := 0; i < len(s0); i++ {
-		s0[i] = int16(i + (util.Q>>1)%util.Q - (util.Q >> 1))
+		s0[i] = int16((s0[i]+(util.Q>>1))%util.Q - (util.Q >> 1))
 	}
+
+	fmt.Println("\ns0: ", s0)
+
 	for _, v := range s0 {
-		normSign += uint32(util.SquareInt16(v))
+		normSign += uint32(v) * uint32(v)
 	}
+	fmt.Println("\ns0 sum: ", normSign)
 	for _, v := range s1 {
-		normSign += uint32(util.SquareInt16(v))
+		normSign += uint32(v) * uint32(v)
 	}
+
 	if normSign > PubParam.sigbound {
-		fmt.Println("Squared norm of signature is too large: ", normSign)
+		fmt.Println(PubParam.sigbound)
 		return false
 	}
+	fmt.Println("\nnormSign: ", normSign)
 	return true
 }
-
-/*
-func (pk *PublicKey) String() string {
-	return fmt.Sprintf("Public for n = %d:\nh = %d", pk.n, pk.h)
-}
-
-func (sk *SecretKey) HashToPoint(message []byte, salt []byte) []int {
-	// code to hash the message
-	// defined public key HashToPoint as well
-}
-
-func (sk *SecretKey) Verify(message []byte, signature []byte) bool {
-	// code to verify the signature
-	// associated argument is supposed to be public??
-}
-
-func (sk *SecretKey) String() string {
-	return fmt.Sprintf("Private key for n = %d:\nf = %v\ng = %v\nF = %v\nG = %v", sk.n, sk.f, sk.g, sk.F, sk.G)
-}
-*/

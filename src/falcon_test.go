@@ -76,7 +76,7 @@ func TestNewPrivateKey(t *testing.T) {
 
 func TestGetPublicKey(t *testing.T) {
 	pub := firstPrivKey512.GetPublicKey()
-	log.Printf("Public key: %v", pub)
+	log.Printf("Public key: %v", pub.h)
 }
 
 // below here are added
@@ -91,24 +91,82 @@ func TestNewKeyPair(t *testing.T) {
 	}
 }
 
-/*func TestSignVerify(t *testing.T) {
-	n := uint16(16)
-	priv, pub, err := NewKeyPair(uint16(n))
+func TestHashToPointPriv(t *testing.T) {
+	n := 16
+	message := "message"
+	var salt [SaltLen]byte
+	util.RandomBytes(salt[:])
+	priv, err := GeneratePrivateKey(uint16(n))
+
+	if err != nil {
+		t.Errorf("Error GeneratePrivateKey: %v", err)
+	}
+
+	hashed := priv.hashToPoint([]byte(message), salt[:])
+	log.Printf("private hashed value: %f", hashed)
+}
+
+func TestHashToPointPub(t *testing.T) {
+	n := 16
+	message := "message"
+	var salt [SaltLen]byte
+	util.RandomBytes(salt[:])
+	priv, err := GeneratePrivateKey(uint16(n))
+
+	if err != nil {
+		t.Errorf("Error GeneratePrivateKey: %v", err)
+	}
+
+	pub := priv.GetPublicKey()
+
+	hashed := pub.hashToPoint([]byte(message), salt[:])
+	log.Printf("public hashed value: %v", hashed)
+}
+
+func TestBasisAndMatrix(t *testing.T) {
+	n := 16
+	priv, err := GeneratePrivateKey(uint16(n))
 	if err != nil {
 		t.Errorf("Error NewKeyPair: %v", err)
 	}
 
-	message := "message"
-	signature := priv.Sign([]byte(message))
-	if len(signature) == 0 {
-		t.Error("Error generating a signature")
-	}
-	log.Printf("Signature: %v", signature)
-	log.Printf("LMao need to use it: %v", pub)
+	B0FFT, TFFT := basisAndMatrix(priv.f, priv.g, priv.F, priv.G)
+	log.Printf("B0FFT : %v", B0FFT)
+	log.Printf("TFFT : %v", TFFT)
+}
 
-	verification := pub.Verify([]byte(message), signature)
-	if verification == false {
-		t.Error("Error generating a signature")
+/*func TestPreImage(t *testing.T) {
+	n := 16
+	priv, err := GeneratePrivateKey(uint16(n))
+	message := "message"
+	var salt [SaltLen]byte
+	util.RandomBytes(salt[:])
+	if err != nil {
+		t.Errorf("Error NewKeyPair: %v", err)
 	}
-	log.Printf("Verification OK")
+	hashed := priv.hashToPoint([]byte(message), salt[:])
+	s := priv.samplePreImage(hashed)
+	if len(s) < 2 {
+		t.Errorf("Error PreImageSize")
+	}
 }*/
+
+func TestSignVerify(t *testing.T) {
+	n := 64
+	priv, err := GeneratePrivateKey(uint16(n))
+	if err != nil {
+		t.Errorf("Error NewKeyPair: %v", err)
+	}
+	pub := priv.GetPublicKey()
+	log.Printf("pubkey size: %v", len(pub.h))
+	pub.h = []int16{1563, 10333, 9743, 1218, 7437, 1304, 5063, 12105, 976, 6444, 3957, 8542, 1134, 4969, 1830, 6142, 5783, 634, 7169, 10502, 10920, 5798, 7986, 12165, 3839, 10474, 9343, 5701, 11695, 5465, 12123, 6831, 11443, 7050, 6646, 8668, 4189, 8818, 2122, 7685, 10202, 9843, 3290, 6401, 8237, 4683, 2073, 8893, 3730, 5374, 3001, 9924, 7371, 959, 5749, 9207, 2677, 10080, 7638, 1486, 7486, 3329, 956, 8090}
+	message := []byte("abc")
+	signature := []byte("6\x08\x8d\x0e\xc6\xc08\x13_m\x15\xf6\xfb\xfb\xb6\x80g\x15\xe1!\xa9/\t\xabd\xdaL\xa8\xf3x\xf0\x16qW\xf8\x19`j\xc4&\x8a\xe8\xb3E\xf2I\xf6\x89\xa6\x8076E\xf2q\x86\xdcl\xae\x8c\xba\xdc\x8f\xa8\x1d\xac\xa2\xfb\xafK\xb0Y\x9a\xa1\x1e^\xd1\x8c=\xe2\x03r\x8e\x9cl\xfbt\xb6\xa2\x9d*\xda\x1e\x95\xcf\xa3:Y\xed}\xf6S\xcav\t\x96\xc9\xd4\xec\xee\x96}!\xd8\xe5d\x10\x00\x00\x00\x00\x00")
+
+	verification := pub.Verify(message, signature)
+	if verification == false {
+		t.Error("Error verifying signature")
+	} else {
+		log.Printf("Verification OK")
+	}
+}

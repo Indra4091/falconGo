@@ -1,7 +1,7 @@
 package falcon
 
 // Bytelength of the signing salt and header
-const HeadLen = 4
+const HeadLen = 1
 const SaltLen = 40 // {0, 1}^320
 const SeedLen = 56
 
