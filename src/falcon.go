@@ -369,17 +369,17 @@ func (pubKey *PublicKey) hashToPoint(message []byte, salt []byte) []int16 {
 
 func (pubKey *PublicKey) Verify(message []byte, signature []byte) bool {
 	//checking
-	fmt.Println("\npubKey as list: ", pubKey.h)
+	/*fmt.Println("\npubKey as list: ", pubKey.h)*/
 	fmt.Println("\nsignature as list: ", signature)
 
 	salt := signature[HeadLen : HeadLen+SaltLen]
 	encS := signature[HeadLen+SaltLen:]
 	PubParam := GetParamSet(pubKey.n)
 
-	fmt.Println("\nsalt: ", salt)
+	/*fmt.Println("\nsalt: ", salt)
 	fmt.Println("\nSaltLen: ", SaltLen)
 	fmt.Println("\nHeadLen: ", HeadLen)
-	fmt.Println("\nencS: ", encS)
+	fmt.Println("\nencS: ", encS)*/
 
 	var normSign uint32
 	var s1 []int16
@@ -387,7 +387,7 @@ func (pubKey *PublicKey) Verify(message []byte, signature []byte) bool {
 	ss1, err := internal.Decompress(encS, int(PubParam.sigbytelen-HeadLen-SaltLen), int(pubKey.n))
 	//Decompress working fine
 
-	fmt.Println("\nsigPart s1: ", ss1)
+	/*fmt.Println("\nsigPart s1: ", ss1)*/
 
 	if err != nil {
 		fmt.Println("invalid encoding")
@@ -400,30 +400,31 @@ func (pubKey *PublicKey) Verify(message []byte, signature []byte) bool {
 
 	// compute s0 and normalize its coefficients in (-q/2, q/2]
 	hashed := pubKey.hashToPoint(message, salt)
-	fmt.Println("\nhashed value: ", hashed)
+	/*fmt.Println("\nhashed value: ", hashed)*/
 
 	s0 := ntt.SubZq(hashed, ntt.MulZq(s1, pubKey.h))
-	fmt.Println("\ns0 before normalization: ", s0)
-	fmt.Println("\nQ: ", util.Q)
+	/*fmt.Println("\ns0 before normalization: ", s0)
+	fmt.Println("\nQ: ", util.Q)*/
 
 	for i := 0; i < len(s0); i++ {
 		s0[i] = int16((s0[i]+(util.Q>>1))%util.Q - (util.Q >> 1))
 	}
 
-	fmt.Println("\ns0: ", s0)
+	/*fmt.Println("\ns0: ", s0)*/
 
 	for _, v := range s0 {
 		normSign += uint32(v) * uint32(v)
 	}
-	fmt.Println("\ns0 sum: ", normSign)
+	//fmt.Println("\ns0 sum: ", normSign)
 	for _, v := range s1 {
 		normSign += uint32(v) * uint32(v)
 	}
 
+	fmt.Println("\nsignature bound: ", PubParam.sigbound)
+	fmt.Println("normSign: ", normSign)
+
 	if normSign > PubParam.sigbound {
-		fmt.Println(PubParam.sigbound)
 		return false
 	}
-	fmt.Println("\nnormSign: ", normSign)
 	return true
 }

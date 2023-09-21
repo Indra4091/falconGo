@@ -1,7 +1,13 @@
 package falcon
 
 import (
+	"bufio"
+	"fmt"
+	"io"
+	"io/ioutil"
 	"log"
+	"strconv"
+	"strings"
 	"testing"
 
 	kat "github.com/realForbis/go-falcon-WIP/src/internal/KAT"
@@ -151,7 +157,34 @@ func TestBasisAndMatrix(t *testing.T) {
 	}
 }*/
 
+func ReadInts(r io.Reader) ([]int, error) {
+	scanner := bufio.NewScanner(r)
+	scanner.Split(bufio.ScanWords)
+	var result []int
+	for scanner.Scan() {
+		x, err := strconv.Atoi(scanner.Text())
+		if err != nil {
+			return result, err
+		}
+		result = append(result, x)
+	}
+	return result, scanner.Err()
+}
+
 func TestSignVerify(t *testing.T) {
+	//signature := []byte("6\x08\x8d\x0e\xc6\xc08\x13_m\x15\xf6\xfb\xfb\xb6\x80g\x15\xe1!\xa9/\t\xabd\xdaL\xa8\xf3x\xf0\x16qW\xf8\x19`j\xc4&\x8a\xe8\xb3E\xf2I\xf6\x89\xa6\x8076E\xf2q\x86\xdcl\xae\x8c\xba\xdc\x8f\xa8\x1d\xac\xa2\xfb\xafK\xb0Y\x9a\xa1\x1e^\xd1\x8c=\xe2\x03r\x8e\x9cl\xfbt\xb6\xa2\x9d*\xda\x1e\x95\xcf\xa3:Y\xed}\xf6S\xcav\t\x96\xc9\xd4\xec\xee\x96}!\xd8\xe5d\x10\x00\x00\x00\x00\x00")
+	//log.Printf("help: %v\n", signature)
+
+	f, err1 := ioutil.ReadFile("message.txt")
+	s, err2 := ioutil.ReadFile("signature.txt")
+
+	if err1 != nil {
+		t.Error("couldn't read file")
+	}
+	if err2 != nil {
+		t.Error("couldn't read file")
+	}
+
 	n := 64
 	priv, err := GeneratePrivateKey(uint16(n))
 	if err != nil {
@@ -160,13 +193,43 @@ func TestSignVerify(t *testing.T) {
 	pub := priv.GetPublicKey()
 	log.Printf("pubkey size: %v", len(pub.h))
 	pub.h = []int16{1563, 10333, 9743, 1218, 7437, 1304, 5063, 12105, 976, 6444, 3957, 8542, 1134, 4969, 1830, 6142, 5783, 634, 7169, 10502, 10920, 5798, 7986, 12165, 3839, 10474, 9343, 5701, 11695, 5465, 12123, 6831, 11443, 7050, 6646, 8668, 4189, 8818, 2122, 7685, 10202, 9843, 3290, 6401, 8237, 4683, 2073, 8893, 3730, 5374, 3001, 9924, 7371, 959, 5749, 9207, 2677, 10080, 7638, 1486, 7486, 3329, 956, 8090}
-	message := []byte("abc")
-	signature := []byte("6\x08\x8d\x0e\xc6\xc08\x13_m\x15\xf6\xfb\xfb\xb6\x80g\x15\xe1!\xa9/\t\xabd\xdaL\xa8\xf3x\xf0\x16qW\xf8\x19`j\xc4&\x8a\xe8\xb3E\xf2I\xf6\x89\xa6\x8076E\xf2q\x86\xdcl\xae\x8c\xba\xdc\x8f\xa8\x1d\xac\xa2\xfb\xafK\xb0Y\x9a\xa1\x1e^\xd1\x8c=\xe2\x03r\x8e\x9cl\xfbt\xb6\xa2\x9d*\xda\x1e\x95\xcf\xa3:Y\xed}\xf6S\xcav\t\x96\xc9\xd4\xec\xee\x96}!\xd8\xe5d\x10\x00\x00\x00\x00\x00")
 
-	verification := pub.Verify(message, signature)
-	if verification == false {
-		t.Error("Error verifying signature")
-	} else {
-		log.Printf("Verification OK")
+	var message []uint8
+	msgg := strings.Split(string(f), "\n")
+	for _, l := range msgg {
+		bb := strings.NewReader(l)
+		scanner1 := bufio.NewScanner(bb)
+		scanner1.Split(bufio.ScanWords)
+		for scanner1.Scan() {
+			x, err := strconv.Atoi(scanner1.Text())
+			if err != nil {
+				t.Error("error converting bytearray to signature")
+			}
+			message = append(message, uint8(x))
+		}
+	}
+
+	read_lines := strings.Split(string(s), "\n")
+	for _, line := range read_lines {
+		r := strings.NewReader(line)
+		scanner := bufio.NewScanner(r)
+		scanner.Split(bufio.ScanWords)
+		var signature []uint8
+		for scanner.Scan() {
+			x, err := strconv.Atoi(scanner.Text())
+			if err != nil {
+				t.Error("error converting bytearray to signature")
+			}
+			signature = append(signature, uint8(x))
+		}
+
+		fmt.Println("message: ", message)
+
+		verification := pub.Verify([]byte(message), []byte(signature))
+		if verification == false {
+			t.Error("Error verifying signature")
+		} else {
+			log.Printf("Verification OK")
+		}
 	}
 }
