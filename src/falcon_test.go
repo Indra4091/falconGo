@@ -194,8 +194,13 @@ func TestSignVerify(t *testing.T) {
 	log.Printf("pubkey size: %v", len(pub.h))
 	pub.h = []int16{1563, 10333, 9743, 1218, 7437, 1304, 5063, 12105, 976, 6444, 3957, 8542, 1134, 4969, 1830, 6142, 5783, 634, 7169, 10502, 10920, 5798, 7986, 12165, 3839, 10474, 9343, 5701, 11695, 5465, 12123, 6831, 11443, 7050, 6646, 8668, 4189, 8818, 2122, 7685, 10202, 9843, 3290, 6401, 8237, 4683, 2073, 8893, 3730, 5374, 3001, 9924, 7371, 959, 5749, 9207, 2677, 10080, 7638, 1486, 7486, 3329, 956, 8090}
 
-	var message []uint8
+	message := make([][]uint8, 1000)
+	for i := 0; i < 1000; i++ {
+		message[i] = make([]uint8, 0)
+	}
+
 	msgg := strings.Split(string(f), "\n")
+	index := 0
 	for _, l := range msgg {
 		bb := strings.NewReader(l)
 		scanner1 := bufio.NewScanner(bb)
@@ -205,12 +210,15 @@ func TestSignVerify(t *testing.T) {
 			if err != nil {
 				t.Error("error converting bytearray to signature")
 			}
-			message = append(message, uint8(x))
+			message[index] = append(message[index], uint8(x))
 		}
+		index++
 	}
 
+	index = 0
 	read_lines := strings.Split(string(s), "\n")
 	for _, line := range read_lines {
+
 		r := strings.NewReader(line)
 		scanner := bufio.NewScanner(r)
 		scanner.Split(bufio.ScanWords)
@@ -223,13 +231,22 @@ func TestSignVerify(t *testing.T) {
 			signature = append(signature, uint8(x))
 		}
 
-		fmt.Println("message: ", message)
+		if len(signature) == 0 {
+			log.Printf("index: %v\n", index)
+			break
+		}
 
-		verification := pub.Verify([]byte(message), []byte(signature))
+		remainder := index % 1000
+		var signThis []uint8
+		signThis = message[remainder]
+		fmt.Println("message: ", message[remainder])
+
+		verification := pub.Verify([]byte(signThis), []byte(signature))
 		if verification == false {
 			t.Error("Error verifying signature")
 		} else {
 			log.Printf("Verification OK")
 		}
+		index++
 	}
 }
