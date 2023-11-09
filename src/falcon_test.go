@@ -175,8 +175,9 @@ func TestSignVerify(t *testing.T) {
 	//signature := []byte("6\x08\x8d\x0e\xc6\xc08\x13_m\x15\xf6\xfb\xfb\xb6\x80g\x15\xe1!\xa9/\t\xabd\xdaL\xa8\xf3x\xf0\x16qW\xf8\x19`j\xc4&\x8a\xe8\xb3E\xf2I\xf6\x89\xa6\x8076E\xf2q\x86\xdcl\xae\x8c\xba\xdc\x8f\xa8\x1d\xac\xa2\xfb\xafK\xb0Y\x9a\xa1\x1e^\xd1\x8c=\xe2\x03r\x8e\x9cl\xfbt\xb6\xa2\x9d*\xda\x1e\x95\xcf\xa3:Y\xed}\xf6S\xcav\t\x96\xc9\xd4\xec\xee\x96}!\xd8\xe5d\x10\x00\x00\x00\x00\x00")
 	//log.Printf("help: %v\n", signature)
 
-	f, err1 := ioutil.ReadFile("message.txt")
-	s, err2 := ioutil.ReadFile("signature.txt")
+	f, err1 := ioutil.ReadFile("messageC.txt")
+	s, err2 := ioutil.ReadFile("signatureC.txt")
+	th, err3 := ioutil.ReadFile("pubkeyC.txt")
 
 	if err1 != nil {
 		t.Error("couldn't read file")
@@ -184,18 +185,21 @@ func TestSignVerify(t *testing.T) {
 	if err2 != nil {
 		t.Error("couldn't read file")
 	}
+	if err3 != nil {
+		t.Error("couldn't read file")
+	}
 
-	n := 64
+	n := 512
 	priv, err := GeneratePrivateKey(uint16(n))
 	if err != nil {
 		t.Errorf("Error NewKeyPair: %v", err)
 	}
 	pub := priv.GetPublicKey()
-	log.Printf("pubkey size: %v", len(pub.h))
-	pub.h = []int16{1563, 10333, 9743, 1218, 7437, 1304, 5063, 12105, 976, 6444, 3957, 8542, 1134, 4969, 1830, 6142, 5783, 634, 7169, 10502, 10920, 5798, 7986, 12165, 3839, 10474, 9343, 5701, 11695, 5465, 12123, 6831, 11443, 7050, 6646, 8668, 4189, 8818, 2122, 7685, 10202, 9843, 3290, 6401, 8237, 4683, 2073, 8893, 3730, 5374, 3001, 9924, 7371, 959, 5749, 9207, 2677, 10080, 7638, 1486, 7486, 3329, 956, 8090}
+	//pub.h = []int16{11496, 8750, 6367, 8513, 9698, 2801, 11184, 7720, 3044, 6551, 12169, 6495, 2608, 10601, 3965, 2608, 6931, 5266, 5015, 11190, 11904, 11241, 2735, 6906, 7831, 6600, 4500, 9359, 4245, 5436, 8774, 2589, 4561, 8983, 696, 8332, 4550, 1996, 2855, 7575, 2429, 2784, 869, 12283, 7148, 11327, 8000, 2406, 9422, 7003, 9693, 10658, 1286, 7617, 240, 1465, 4821, 9727, 6893, 10912, 4320, 10947, 11575, 5020, 1246, 9103, 12228, 982, 1652, 5442, 5066, 1984, 5969, 10958, 11600, 6828, 10785, 9074, 11562, 8427, 7384, 10225, 3146, 9884, 227, 10528, 6914, 7012, 11418, 618, 2344, 2442, 12118, 1590, 4659, 9, 6054, 2974, 1062, 7889, 7428, 11552, 10955, 3953, 11650, 5488, 3360, 6419, 2018, 7855, 11937, 10273, 11760, 10619, 2946, 9827, 1391, 5288, 10081, 7879, 436, 2821, 10976, 4719, 3805, 9319, 9630, 2921, 4919, 11006, 8476, 822, 3362, 6488, 3539, 2966, 9066, 11199, 3581, 6766, 9874, 5432, 8230, 1904, 10886, 9536, 650, 3017, 8013, 3273, 11999, 10043, 9288, 8661, 3001, 9709, 1944, 7455, 3436, 5174, 887, 5047, 7710, 10546, 5349, 11586, 10870, 6055, 587, 5456, 2913, 7852, 4569, 89, 11242, 6656, 7772, 5474, 11556, 1074, 5017, 8253, 6103, 11848, 4716, 6126, 4405, 5651, 6845, 369, 11740, 7603, 7746, 7584, 915, 6450, 9542, 10494, 256, 9124, 4106, 8698, 7618, 1531, 11543, 9513, 1711, 1120, 6401, 11319, 947, 7814, 4649, 7342, 10521, 1379, 7114, 4336, 6053, 6221, 1914, 3752, 8195, 10946, 5208, 1259, 11370, 6416, 5131, 5381, 8682, 7596, 8281, 2484, 11339, 11788, 7058, 5553, 2273, 6449, 608, 11847, 4196, 2901, 12045, 6603, 3256, 9934, 7986, 8114, 11513, 907, 8637, 6623, 4668, 4038, 11237, 5537, 4283, 6388, 6134, 8930, 2128, 2128, 2963, 7004, 8973, 7762, 171, 10591, 7196, 745, 2586, 2633, 10421, 8891, 3400, 4224, 2007, 4723, 10362, 2104, 8976, 722, 11441, 2652, 6325, 6241, 2988, 11748, 7855, 9040, 7088, 9407, 9770, 867, 2077, 4362, 12110, 1082, 1850, 4862, 4330, 10985, 5379, 10483, 7677, 2619, 2355, 3252, 2103, 6398, 11488, 3782, 3245, 9556, 5907, 4738, 8334, 8587, 6139, 5343, 6495, 8498, 7104, 10335, 8532, 10159, 8308, 9264, 10616, 12269, 4354, 1430, 4838, 1508, 10559, 2651, 6956, 11497, 8752, 1131, 2791, 4011, 4253, 3438, 9498, 5714, 10445, 10070, 5480, 5019, 6473, 7725, 1261, 3066, 198, 7815, 2246, 3496, 8064, 739, 5866, 5569, 11456, 2244, 668, 8395, 5445, 2772, 4408, 9293, 11014, 761, 3718, 11571, 3404, 368, 3579, 10321, 6736, 11875, 10187, 529, 280, 2368, 2568, 4932, 6205, 7260, 7792, 7205, 11919, 1381, 11963, 3502, 11363, 7457, 9950, 4892, 10373, 5957, 10007, 711, 11549, 2571, 8529, 8934, 5748, 4109, 6209, 5302, 5566, 1970, 3825, 7545, 351, 11519, 7545, 2503, 3567, 1449, 2813, 4183, 7617, 12054, 6684, 8500, 1397, 2228, 4403, 10069, 7801, 4417, 9204, 1364, 3084, 3708, 8282, 9585, 5338, 10093, 4234, 6005, 8209, 1525, 3841, 5204, 2613, 2267, 3108, 8948, 8153, 7531, 7324, 9187, 2570, 684, 4422, 5060, 8768, 11619, 3214, 707, 7175, 5379, 169, 4774, 6508, 6510, 3021, 11514, 179, 4509, 3931, 3453, 7772, 4992, 4043, 12029, 8039, 9766, 8752, 5730, 5298, 2055, 8370, 9754, 2872, 731, 9288, 2970, 315, 5281, 10632, 4920, 609, 5117, 4981, 3040, 9677, 1530, 695, 10176, 5260, 3336, 2120, 6452, 6772, 3911, 5640, 4868}
+	pub.h = []int16{}
 
-	message := make([][]uint8, 1000)
-	for i := 0; i < 1000; i++ {
+	message := make([][]uint8, 10)
+	for i := 0; i < 10; i++ {
 		message[i] = make([]uint8, 0)
 	}
 
@@ -215,38 +219,60 @@ func TestSignVerify(t *testing.T) {
 		index++
 	}
 
+	signature := make([][]uint8, 10)
+	for i := 0; i < 1; i++ {
+		signature[i] = make([]uint8, 0)
+	}
+
 	index = 0
 	read_lines := strings.Split(string(s), "\n")
 	for _, line := range read_lines {
-
-		r := strings.NewReader(line)
-		scanner := bufio.NewScanner(r)
-		scanner.Split(bufio.ScanWords)
-		var signature []uint8
-		for scanner.Scan() {
-			x, err := strconv.Atoi(scanner.Text())
-			if err != nil {
-				t.Error("error converting bytearray to signature")
-			}
-			signature = append(signature, uint8(x))
-		}
-
 		if len(signature) == 0 {
 			log.Printf("index: %v\n", index)
 			break
 		}
 
-		remainder := index % 1000
-		var signThis []uint8
-		signThis = message[remainder]
-		fmt.Println("message: ", message[remainder])
+		r := strings.NewReader(line)
+		scanner := bufio.NewScanner(r)
+		scanner.Split(bufio.ScanWords)
 
-		verification := pub.Verify([]byte(signThis), []byte(signature))
-		if verification == false {
-			t.Error("Error verifying signature")
-		} else {
-			log.Printf("Verification OK")
+		for scanner.Scan() {
+			x, err := strconv.Atoi(scanner.Text())
+			if err != nil {
+				t.Error("error converting bytearray to signature")
+			}
+			signature[index] = append(signature[index], uint8(x))
 		}
 		index++
+	}
+
+	index = 0
+	publicKey := strings.Split(string(th), "\n")
+	for _, l := range publicKey {
+		bb := strings.NewReader(l)
+		scanner1 := bufio.NewScanner(bb)
+		scanner1.Split(bufio.ScanWords)
+		for scanner1.Scan() {
+			x, err := strconv.Atoi(scanner1.Text())
+			if err != nil {
+				t.Error("error converting bytearray to signature")
+			}
+			pub.h = append(pub.h, int16(x))
+		}
+
+		for i := 0; i < 1; i++ {
+			remainder := index % 10
+			var signThis []uint8
+			signThis = message[remainder]
+			fmt.Println("message: ", message[remainder])
+
+			verification := pub.Verify([]byte(signThis), []byte(signature[i]))
+			if verification == false {
+				t.Error("Error verifying signature")
+			} else {
+				log.Printf("Verification OK")
+			}
+			index++
+		}
 	}
 }
