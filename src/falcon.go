@@ -1,6 +1,7 @@
 package falcon
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"math"
@@ -37,24 +38,25 @@ func process_block(A [25]uint64) {
 	var tt0, tt1, tt2, tt3 uint64
 	var t, kt uint64
 	var c0, c1, c2, c3, c4, bnn uint64
+	var j int
 
 	/*
 	 * Invert some words (alternate internal representation, which
 	 * saves some operations).
 	 */
 	// ~x = -x-1
-	A[1] = -A[1] - 1
-	A[2] = -A[2] - 1
-	A[8] = -A[8] - 1
-	A[12] = -A[12] - 1
-	A[17] = -A[17] - 1
-	A[20] = -A[20] - 1
+	A[1] = 0 - A[1] - 1
+	A[2] = 0 - A[2] - 1
+	A[8] = 0 - A[8] - 1
+	A[12] = 0 - A[12] - 1
+	A[17] = 0 - A[17] - 1
+	A[20] = 0 - A[20] - 1
 
 	/*
 	 * Compute the 24 rounds. This loop is partially unrolled (each
 	 * iteration computes two rounds).
 	 */
-	for j := 0; j < 24; j += 2 {
+	for j = 0; j < 24; j += 2 {
 
 		tt0 = A[1] ^ A[6]
 		tt1 = A[11] ^ A[16]
@@ -156,7 +158,7 @@ func process_block(A [25]uint64) {
 		A[19] = (A[19] << 8) | (A[19] >> (64 - 8))
 		A[24] = (A[24] << 14) | (A[24] >> (64 - 14))
 
-		bnn = -A[12] - 1 //~
+		bnn = 0 - A[12] - 1 //~
 		kt = A[6] | A[12]
 		c0 = A[0] ^ kt
 		kt = bnn | A[18]
@@ -172,7 +174,7 @@ func process_block(A [25]uint64) {
 		A[12] = c2
 		A[18] = c3
 		A[24] = c4
-		bnn = -A[22] - 1 //~
+		bnn = 0 - A[22] - 1 //~
 		kt = A[9] | A[10]
 		c0 = A[3] ^ kt
 		kt = A[10] & A[16]
@@ -188,7 +190,7 @@ func process_block(A [25]uint64) {
 		A[10] = c2
 		A[16] = c3
 		A[22] = c4
-		bnn = -A[19] - 1 //~
+		bnn = 0 - A[19] - 1 //~
 		kt = A[7] | A[13]
 		c0 = A[1] ^ kt
 		kt = A[13] & A[19]
@@ -204,7 +206,7 @@ func process_block(A [25]uint64) {
 		A[13] = c2
 		A[19] = c3
 		A[20] = c4
-		bnn = -A[17] - 1 //~
+		bnn = 0 - A[17] - 1 //~
 		kt = A[5] & A[11]
 		c0 = A[4] ^ kt
 		kt = A[11] | A[17]
@@ -220,7 +222,7 @@ func process_block(A [25]uint64) {
 		A[11] = c2
 		A[17] = c3
 		A[23] = c4
-		bnn = -A[8] - 1 //~
+		bnn = 0 - A[8] - 1 //~
 		kt = bnn & A[14]
 		c0 = A[2] ^ kt
 		kt = A[14] | A[15]
@@ -338,7 +340,7 @@ func process_block(A [25]uint64) {
 		A[23] = (A[23] << 8) | (A[23] >> (64 - 8))
 		A[21] = (A[21] << 14) | (A[21] >> (64 - 14))
 
-		bnn = -A[13] - 1 //~
+		bnn = 0 - A[13] - 1 //~
 		kt = A[9] | A[13]
 		c0 = A[0] ^ kt
 		kt = bnn | A[17]
@@ -354,7 +356,7 @@ func process_block(A [25]uint64) {
 		A[13] = c2
 		A[17] = c3
 		A[21] = c4
-		bnn = -A[14] - 1 //~
+		bnn = 0 - A[14] - 1 //~
 		kt = A[22] | A[1]
 		c0 = A[18] ^ kt
 		kt = A[1] & A[5]
@@ -370,7 +372,7 @@ func process_block(A [25]uint64) {
 		A[1] = c2
 		A[5] = c3
 		A[14] = c4
-		bnn = -A[23] - 1 //~
+		bnn = 0 - A[23] - 1 //~
 		kt = A[10] | A[19]
 		c0 = A[6] ^ kt
 		kt = A[19] & A[23]
@@ -386,7 +388,7 @@ func process_block(A [25]uint64) {
 		A[19] = c2
 		A[23] = c3
 		A[2] = c4
-		bnn = -A[11] - 1 //~
+		bnn = 0 - A[11] - 1 //~
 		kt = A[3] & A[7]
 		c0 = A[24] ^ kt
 		kt = A[7] | A[11]
@@ -402,7 +404,7 @@ func process_block(A [25]uint64) {
 		A[7] = c2
 		A[11] = c3
 		A[15] = c4
-		bnn = -A[16] - 1 //~
+		bnn = 0 - A[16] - 1 //~
 		kt = bnn & A[20]
 		c0 = A[12] ^ kt
 		kt = A[20] | A[4]
@@ -451,12 +453,12 @@ func process_block(A [25]uint64) {
 	 * Invert some words back to normal representation.
 	 */
 	//~x = -x - 1
-	A[1] = -A[1] - 1
-	A[2] = -A[2] - 1
-	A[8] = -A[8] - 1
-	A[12] = -A[12] - 1
-	A[17] = -A[17] - 1
-	A[20] = -A[20] - 1
+	A[1] = 0 - A[1] - 1
+	A[2] = 0 - A[2] - 1
+	A[8] = 0 - A[8] - 1
+	A[12] = 0 - A[12] - 1
+	A[17] = 0 - A[17] - 1
+	A[20] = 0 - A[20] - 1
 }
 
 var (
@@ -735,59 +737,110 @@ func (privKey *PrivateKey) hashToPoint(message []byte, salt []byte) []float64 {
 	return hashed
 }*/
 
+func bytesToUint64s(buf []byte) uint64 {
+	i := uint64(binary.LittleEndian.Uint64(buf))
+	return i
+}
+
+func uint64sToBytes(buf uint64) []byte {
+	r := make([]byte, 8)
+	binary.LittleEndian.PutUint64(r, buf)
+	return r
+}
+
 // user defined hash function/struct (shake256)
 type inner_shake256_context struct {
 	A    [25]uint64 //in C implementation, A and dbuf are in union,
-	dbuf [200]uint8 //go doesn't have union
+	dbuf [200]uint8 //go doesn't have union, code not working properly
 	dptr uint64
 }
 
-func shake256_init(sc *inner_shake256_context) {
+func (sc *inner_shake256_context) shake256_init() {
 	sc.dptr = 0
 	//memset(sc->st.A, 0, sizeof sc->st.A);
 	for j := range sc.A {
 		sc.A[j] = 0
 	}
+
+	for j := range sc.dbuf {
+		sc.dbuf[j] = 0
+	}
 }
 
-func shake256_inject(sc *inner_shake256_context, salt []uint8, salt_len uint64) {
+func (sc *inner_shake256_context) shake256_inject(message []uint8, message_len uint64) {
 	dptr := sc.dptr
 	var index uint64
 	index = 0
 
-	for salt_len > 0 {
+	for message_len > 0 {
 		var clen uint64
 		var u uint64
 
 		clen = 136 - dptr
-		if clen > salt_len {
-			clen = salt_len
+		if clen > message_len {
+			clen = message_len
 		}
 		// #if
-		for u = 0; u < clen; u++ {
-			sc.dbuf[dptr+u] ^= salt[index+u]
+		//convertion A -> dbuf
+		for i := 0; i < 25; i++ {
+			smaller := uint64sToBytes(sc.A[i])
+			for j := 0; j < 8; j++ {
+				sc.dbuf[i*8+j] = smaller[j]
+			}
 		}
+
+		for u = 0; u < clen; u++ {
+			sc.dbuf[dptr+u] ^= message[index+u]
+		}
+
+		//convertion dbuf -> A
+		for i := 0; i < 25; i++ {
+			r := make([]byte, 8)
+			for j := 0; j < 8; j++ {
+				r[j] = sc.dbuf[i*8+j]
+			}
+			sc.A[i] = bytesToUint64s(r)
+		}
+
 		// #endif
 		dptr += clen
 		index += clen
-		salt_len -= clen
+		message_len -= clen
 		if dptr == 136 {
 			process_block(sc.A)
 			dptr = 0
+
+			//convertion A -> dbuf
+			for i := 0; i < 25; i++ {
+				smaller := uint64sToBytes(sc.A[i])
+				for j := 0; j < 8; j++ {
+					sc.dbuf[i*8+j] = smaller[j]
+				}
+			}
 		}
 	}
 	sc.dptr = dptr
 }
 
-func shake256_flip(sc *inner_shake256_context) {
+func (sc *inner_shake256_context) shake256_flip() {
 	/*sc->st.dbuf[sc->dptr] ^= 0x1F;
 	sc->st.dbuf[135] ^= 0x80;*/
+
 	sc.dbuf[sc.dptr] ^= 0x1F
 	sc.dbuf[135] ^= 0x80
 	sc.dptr = 136
+
+	//convertion dbuf -> A
+	for i := 0; i < 25; i++ {
+		r := make([]byte, 8)
+		for j := 0; j < 8; j++ {
+			r[j] = sc.dbuf[i*8+j]
+		}
+		sc.A[i] = bytesToUint64s(r)
+	}
 }
 
-func shake256_extract(sc *inner_shake256_context, buf [2]uint8, len uint64) {
+func (sc *inner_shake256_context) shake256_extract(buf *[2]uint8, len uint64) {
 	dptr := sc.dptr
 	var index uint64
 	index = 0
@@ -797,19 +850,37 @@ func shake256_extract(sc *inner_shake256_context, buf [2]uint8, len uint64) {
 
 		if dptr == 136 {
 			process_block(sc.A)
+
+			//convertion
+			for i := 0; i < 25; i++ {
+				smaller := uint64sToBytes(sc.A[i])
+				for j := 0; j < 8; j++ {
+					sc.dbuf[i*8+j] = smaller[j]
+				}
+			}
 			dptr = 0
 		}
+
 		clen = 136 - dptr
 		if clen > len {
 			clen = len
 		}
 		len -= clen
-
 		// #if
 		var i uint64
 		for i = 0; i < clen; i++ {
 			buf[index+i] = sc.dbuf[dptr+i]
 		}
+
+		//convertion dbuf -> A
+		for i := 0; i < 25; i++ {
+			r := make([]byte, 8)
+			for j := 0; j < 8; j++ {
+				r[j] = sc.dbuf[i*8+j]
+			}
+			sc.A[i] = bytesToUint64s(r)
+		}
+
 		//memcpy(out, sc->st.dbuf + dptr, clen);
 		dptr += clen
 		index += clen
@@ -817,17 +888,21 @@ func shake256_extract(sc *inner_shake256_context, buf [2]uint8, len uint64) {
 	sc.dptr = dptr
 }
 
+func (sc *inner_shake256_context) check() {
+	for i := 0; i < 200; i++ {
+		fmt.Println(sc.dbuf[i])
+	}
+}
+
 func (pubKey *PublicKey) hashToPoint(message []byte, salt []byte) []int16 {
 
 	//falcon_verify start content starts here
 	var hd inner_shake256_context
 
-	shake256_init(&hd)
-	shake256_inject(&hd, salt, 40)
-	//falcon_verify_start content finishes here
-
-	//falcon_verify_finish starts here
-	shake256_flip(&hd)
+	hd.shake256_init()
+	hd.shake256_inject(salt, uint64(len(salt)))
+	hd.shake256_inject(message, uint64(len(message)))
+	hd.shake256_flip()
 	if util.Q > (1 << 16) {
 		panic("Q is too large")
 	}
@@ -844,15 +919,18 @@ func (pubKey *PublicKey) hashToPoint(message []byte, salt []byte) []int16 {
 	for i < int(pubKey.n) {
 		//take two bytes, transform into int16
 		var buf [2]uint8
-		shake256_extract(&hd, buf, 2)
+		hd.shake256_extract(&buf, 2)
 		// Map the bytes to coefficients
-		elt := (int(buf[0]) << 8) | int(buf[1])
+		elt := (uint32(buf[0]) << 8) | uint32(buf[1])
+
 		// Implicit rejection sampling
-		if elt < k*util.Q {
+		if elt < uint32(k*util.Q) {
 			hashed[i] = int16(elt % util.Q)
 			i++
 		}
 	}
+
+	hd.check()
 	return hashed
 }
 
@@ -988,13 +1066,11 @@ func (pubKey *PublicKey) Verify(message []byte, signature []byte) bool {
 
 	for _, v := range s0 {
 		normSign += uint32(v) * uint32(v)
-		fmt.Println("s0: ", v)
 		//ng |= normSign
 	}
 	//fmt.Println("\ns0 sum: ", normSign)
 	for _, v := range s1 {
 		normSign += uint32(v) * uint32(v)
-		fmt.Println("s1: ", v)
 		//ng |= normSign
 	}
 
