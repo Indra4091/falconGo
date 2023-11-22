@@ -33,7 +33,7 @@ var RC = []uint64{
 	0x0000000080000001, 0x8000000080008008,
 }
 
-func process_block(A [25]uint64) {
+func process_block(A *[25]uint64) {
 	var t0, t1, t2, t3, t4 uint64
 	var tt0, tt1, tt2, tt3 uint64
 	var t, kt uint64
@@ -737,7 +737,7 @@ func (privKey *PrivateKey) hashToPoint(message []byte, salt []byte) []float64 {
 	return hashed
 }*/
 
-func bytesToUint64s(buf []byte) uint64 {
+/*func bytesToUint64s(buf []byte) uint64 {
 	i := uint64(binary.LittleEndian.Uint64(buf))
 	return i
 }
@@ -746,13 +746,43 @@ func uint64sToBytes(buf uint64) []byte {
 	r := make([]byte, 8)
 	binary.LittleEndian.PutUint64(r, buf)
 	return r
+}*/
+
+const (
+	maxRate = 136
+)
+
+type storageBuf [maxRate]byte
+
+func (b *storageBuf) asBytes() *[maxRate]byte {
+	return (*[maxRate]byte)(b)
 }
 
-// user defined hash function/struct (shake256)
 type inner_shake256_context struct {
-	A    [25]uint64 //in C implementation, A and dbuf are in union,
-	dbuf [200]uint8 //go doesn't have union, code not working properly
-	dptr uint64
+	A    [25]uint64
+	dbuf []uint8 //points into storage
+
+	storage storageBuf //storage max size is 168 in crypto/x/sha3, in C it's 136
+	dptr    int
+}
+
+// (reference to sha3 library)
+func xorInGeneric(d *inner_shake256_context, buf []byte) {
+	n := len(buf) / 8
+
+	for i := 0; i < n; i++ {
+		a := binary.LittleEndian.Uint64(buf)
+		d.A[i] ^= a
+		buf = buf[8:]
+	}
+}
+
+// copyOutGeneric copies uint64s to a byte buffer (reference to sha3 library)
+func copyOutGeneric(d *inner_shake256_context, b []byte) {
+	for i := 0; len(b) >= 8; i++ {
+		binary.LittleEndian.PutUint64(b, d.A[i])
+		b = b[8:]
+	}
 }
 
 func (sc *inner_shake256_context) shake256_init() {
@@ -761,16 +791,11 @@ func (sc *inner_shake256_context) shake256_init() {
 	for j := range sc.A {
 		sc.A[j] = 0
 	}
-
-	for j := range sc.dbuf {
-		sc.dbuf[j] = 0
-	}
+	sc.dbuf = sc.storage.asBytes()[:0]
 }
 
-func (sc *inner_shake256_context) shake256_inject(message []uint8, message_len uint64) {
+/*func (sc *inner_shake256_context) shake256_inject(message []uint8, message_len uint64) {
 	dptr := sc.dptr
-	var index uint64
-	index = 0
 
 	for message_len > 0 {
 		var clen uint64
@@ -780,105 +805,116 @@ func (sc *inner_shake256_context) shake256_inject(message []uint8, message_len u
 		if clen > message_len {
 			clen = message_len
 		}
-		// #if
-		//convertion A -> dbuf
-		for i := 0; i < 25; i++ {
-			smaller := uint64sToBytes(sc.A[i])
-			for j := 0; j < 8; j++ {
-				sc.dbuf[i*8+j] = smaller[j]
-			}
-		}
 
 		for u = 0; u < clen; u++ {
-			sc.dbuf[dptr+u] ^= message[index+u]
-		}
-
-		//convertion dbuf -> A
-		for i := 0; i < 25; i++ {
-			r := make([]byte, 8)
-			for j := 0; j < 8; j++ {
-				r[j] = sc.dbuf[i*8+j]
-			}
-			sc.A[i] = bytesToUint64s(r)
+			sc.dbuf = append(sc.dbuf, message[u])
 		}
 
 		// #endif
 		dptr += clen
-		index += clen
 		message_len -= clen
 		if dptr == 136 {
-			process_block(sc.A)
+			xorInGeneric(sc, sc.dbuf) //equivalent of permute function in sha3 library
+			process_block(&sc.A)
 			dptr = 0
-
-			//convertion A -> dbuf
-			for i := 0; i < 25; i++ {
-				smaller := uint64sToBytes(sc.A[i])
-				for j := 0; j < 8; j++ {
-					sc.dbuf[i*8+j] = smaller[j]
-				}
-			}
 		}
 	}
 	sc.dptr = dptr
+}*/
+
+// similar to inject function
+func (d *inner_shake256_context) permute_inject() {
+
+	xorInGeneric(d, d.dbuf)
+	d.dbuf = d.storage.asBytes()[:0]
+	process_block(&d.A)
 }
 
-func (sc *inner_shake256_context) shake256_flip() {
-	/*sc->st.dbuf[sc->dptr] ^= 0x1F;
-	sc->st.dbuf[135] ^= 0x80;*/
+func (d *inner_shake256_context) Write(p []byte) {
 
-	sc.dbuf[sc.dptr] ^= 0x1F
-	sc.dbuf[135] ^= 0x80
-	sc.dptr = 136
+	if d.dbuf == nil {
+		d.dbuf = d.storage.asBytes()[:0]
+	}
 
-	//convertion dbuf -> A
-	for i := 0; i < 25; i++ {
-		r := make([]byte, 8)
-		for j := 0; j < 8; j++ {
-			r[j] = sc.dbuf[i*8+j]
+	for len(p) > 0 {
+		if len(d.dbuf) == 0 && len(p) >= maxRate {
+			// The fast path; absorb a full "rate" bytes of input and apply the permutation.
+			xorInGeneric(d, p[:maxRate])
+			fmt.Println("xor pass")
+			p = p[maxRate:]
+			process_block(&d.A)
+		} else {
+
+			// The slow path; buffer the input until we can fill the sponge, and then xor it in.
+			todo := maxRate - len(d.dbuf)
+			if todo > len(p) {
+				todo = len(p)
+			}
+			d.dbuf = append(d.dbuf, p[:todo]...)
+			p = p[todo:]
+
+			// If the sponge is full, apply the permutation.
+			if len(d.dbuf) == maxRate {
+				d.permute_inject()
+			}
 		}
-		sc.A[i] = bytesToUint64s(r)
 	}
 }
 
-func (sc *inner_shake256_context) shake256_extract(buf *[2]uint8, len uint64) {
+func (sc *inner_shake256_context) shake256_flip() {
+	copyOutGeneric(sc, sc.dbuf)
+	fmt.Println(sc.dbuf)
+	sc.dbuf[sc.dptr] ^= 0x1F
+	sc.dbuf[maxRate-1] ^= 0x80
+	sc.dptr = 136
+}
+
+func (d *inner_shake256_context) Read(out *[2]byte) {
+
+	dptr := d.dptr
+	n := len(out)
+
+	for len(out) > 0 {
+		if dptr == 136 {
+			process_block(&d.A)
+			dptr = 0
+		}
+		clen := 136 - dptr
+		if clen > n {
+			clen = n
+		}
+		n -= clen
+		for i := 0; i < clen; i++ {
+			out[i] = d.dbuf[i]
+		}
+		d.dptr += clen
+		d.dbuf = d.dbuf[n:]
+		//out = out[n:]
+	}
+	d.dptr = dptr
+}
+
+/*func (sc *inner_shake256_context) shake256_extract(buf *[2]uint8, len uint64) {
 	dptr := sc.dptr
 	var index uint64
-	index = 0
 
 	for len > 0 {
-		var clen uint64
 
 		if dptr == 136 {
-			process_block(sc.A)
-
-			//convertion
-			for i := 0; i < 25; i++ {
-				smaller := uint64sToBytes(sc.A[i])
-				for j := 0; j < 8; j++ {
-					sc.dbuf[i*8+j] = smaller[j]
-				}
-			}
+			process_block(&sc.A)
 			dptr = 0
 		}
 
-		clen = 136 - dptr
+		clen := 136 - dptr
 		if clen > len {
 			clen = len
 		}
 		len -= clen
+		sc.dbuf = sc.storage.asBytes()[:dptr+clen]
 		// #if
 		var i uint64
 		for i = 0; i < clen; i++ {
-			buf[index+i] = sc.dbuf[dptr+i]
-		}
-
-		//convertion dbuf -> A
-		for i := 0; i < 25; i++ {
-			r := make([]byte, 8)
-			for j := 0; j < 8; j++ {
-				r[j] = sc.dbuf[i*8+j]
-			}
-			sc.A[i] = bytesToUint64s(r)
+			buf[i] = sc.dbuf[dptr+i]
 		}
 
 		//memcpy(out, sc->st.dbuf + dptr, clen);
@@ -892,7 +928,7 @@ func (sc *inner_shake256_context) check() {
 	for i := 0; i < 200; i++ {
 		fmt.Println(sc.dbuf[i])
 	}
-}
+}*/
 
 func (pubKey *PublicKey) hashToPoint(message []byte, salt []byte) []int16 {
 
@@ -900,9 +936,14 @@ func (pubKey *PublicKey) hashToPoint(message []byte, salt []byte) []int16 {
 	var hd inner_shake256_context
 
 	hd.shake256_init()
-	hd.shake256_inject(salt, uint64(len(salt)))
-	hd.shake256_inject(message, uint64(len(message)))
+	fmt.Println("init clear")
+	hd.Write(salt)
+	fmt.Println("inject clear")
+	hd.Write(message)
+	fmt.Println("inject")
 	hd.shake256_flip()
+	fmt.Println("flip clear")
+
 	if util.Q > (1 << 16) {
 		panic("Q is too large")
 	}
@@ -919,9 +960,11 @@ func (pubKey *PublicKey) hashToPoint(message []byte, salt []byte) []int16 {
 	for i < int(pubKey.n) {
 		//take two bytes, transform into int16
 		var buf [2]uint8
-		hd.shake256_extract(&buf, 2)
+		hd.Read(&buf)
 		// Map the bytes to coefficients
 		elt := (uint32(buf[0]) << 8) | uint32(buf[1])
+		fmt.Println("first ", buf[0])
+		fmt.Println("second ", buf[1])
 
 		// Implicit rejection sampling
 		if elt < uint32(k*util.Q) {
@@ -930,7 +973,6 @@ func (pubKey *PublicKey) hashToPoint(message []byte, salt []byte) []int16 {
 		}
 	}
 
-	hd.check()
 	return hashed
 }
 
