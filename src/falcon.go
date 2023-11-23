@@ -1,10 +1,10 @@
 package falcon
 
 import (
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"math"
+	"math/bits"
 
 	"github.com/realForbis/go-falcon-WIP/src/internal"
 	"github.com/realForbis/go-falcon-WIP/src/internal/transforms/fft"
@@ -14,451 +14,409 @@ import (
 	"golang.org/x/crypto/sha3"
 )
 
-//type (
-//	Tree []any // LDL tree
-//)
-
-var RC = []uint64{
-	0x0000000000000001, 0x0000000000008082,
-	0x800000000000808A, 0x8000000080008000,
-	0x000000000000808B, 0x0000000080000001,
-	0x8000000080008081, 0x8000000000008009,
-	0x000000000000008A, 0x0000000000000088,
-	0x0000000080008009, 0x000000008000000A,
-	0x000000008000808B, 0x800000000000008B,
-	0x8000000000008089, 0x8000000000008003,
-	0x8000000000008002, 0x8000000000000080,
-	0x000000000000800A, 0x800000008000000A,
-	0x8000000080008081, 0x8000000000008080,
-	0x0000000080000001, 0x8000000080008008,
+// rc stores the round constants for use in the ι step.
+var rc = [24]uint64{
+	0x0000000000000001,
+	0x0000000000008082,
+	0x800000000000808A,
+	0x8000000080008000,
+	0x000000000000808B,
+	0x0000000080000001,
+	0x8000000080008081,
+	0x8000000000008009,
+	0x000000000000008A,
+	0x0000000000000088,
+	0x0000000080008009,
+	0x000000008000000A,
+	0x000000008000808B,
+	0x800000000000008B,
+	0x8000000000008089,
+	0x8000000000008003,
+	0x8000000000008002,
+	0x8000000000000080,
+	0x000000000000800A,
+	0x800000008000000A,
+	0x8000000080008081,
+	0x8000000000008080,
+	0x0000000080000001,
+	0x8000000080008008,
 }
 
-func process_block(A *[25]uint64) {
-	var t0, t1, t2, t3, t4 uint64
-	var tt0, tt1, tt2, tt3 uint64
-	var t, kt uint64
-	var c0, c1, c2, c3, c4, bnn uint64
-	var j int
+// keccakF1600 applies the Keccak permutation to a 1600b-wide
+// state represented as a slice of 25 uint64s.
+func process_block(a *[25]uint64) {
+	// Implementation translated from Keccak-inplace.c
+	// in the keccak reference code.
+	var t, bc0, bc1, bc2, bc3, bc4, d0, d1, d2, d3, d4 uint64
 
-	/*
-	 * Invert some words (alternate internal representation, which
-	 * saves some operations).
-	 */
-	// ~x = -x-1
-	A[1] = 0 - A[1] - 1
-	A[2] = 0 - A[2] - 1
-	A[8] = 0 - A[8] - 1
-	A[12] = 0 - A[12] - 1
-	A[17] = 0 - A[17] - 1
-	A[20] = 0 - A[20] - 1
+	for i := 0; i < 24; i += 4 {
+		// Combines the 5 steps in each round into 2 steps.
+		// Unrolls 4 rounds per loop and spreads some steps across rounds.
 
-	/*
-	 * Compute the 24 rounds. This loop is partially unrolled (each
-	 * iteration computes two rounds).
-	 */
-	for j = 0; j < 24; j += 2 {
+		// Round 1
+		bc0 = a[0] ^ a[5] ^ a[10] ^ a[15] ^ a[20]
+		bc1 = a[1] ^ a[6] ^ a[11] ^ a[16] ^ a[21]
+		bc2 = a[2] ^ a[7] ^ a[12] ^ a[17] ^ a[22]
+		bc3 = a[3] ^ a[8] ^ a[13] ^ a[18] ^ a[23]
+		bc4 = a[4] ^ a[9] ^ a[14] ^ a[19] ^ a[24]
+		d0 = bc4 ^ (bc1<<1 | bc1>>63)
+		d1 = bc0 ^ (bc2<<1 | bc2>>63)
+		d2 = bc1 ^ (bc3<<1 | bc3>>63)
+		d3 = bc2 ^ (bc4<<1 | bc4>>63)
+		d4 = bc3 ^ (bc0<<1 | bc0>>63)
 
-		tt0 = A[1] ^ A[6]
-		tt1 = A[11] ^ A[16]
-		tt0 ^= A[21] ^ tt1
-		tt0 = (tt0 << 1) | (tt0 >> 63)
-		tt2 = A[4] ^ A[9]
-		tt3 = A[14] ^ A[19]
-		tt0 ^= A[24]
-		tt2 ^= tt3
-		t0 = tt0 ^ tt2
+		bc0 = a[0] ^ d0
+		t = a[6] ^ d1
+		bc1 = bits.RotateLeft64(t, 44)
+		t = a[12] ^ d2
+		bc2 = bits.RotateLeft64(t, 43)
+		t = a[18] ^ d3
+		bc3 = bits.RotateLeft64(t, 21)
+		t = a[24] ^ d4
+		bc4 = bits.RotateLeft64(t, 14)
+		a[0] = bc0 ^ (bc2 &^ bc1) ^ rc[i]
+		a[6] = bc1 ^ (bc3 &^ bc2)
+		a[12] = bc2 ^ (bc4 &^ bc3)
+		a[18] = bc3 ^ (bc0 &^ bc4)
+		a[24] = bc4 ^ (bc1 &^ bc0)
 
-		tt0 = A[2] ^ A[7]
-		tt1 = A[12] ^ A[17]
-		tt0 ^= A[22] ^ tt1
-		tt0 = (tt0 << 1) | (tt0 >> 63)
-		tt2 = A[0] ^ A[5]
-		tt3 = A[10] ^ A[15]
-		tt0 ^= A[20]
-		tt2 ^= tt3
-		t1 = tt0 ^ tt2
+		t = a[10] ^ d0
+		bc2 = bits.RotateLeft64(t, 3)
+		t = a[16] ^ d1
+		bc3 = bits.RotateLeft64(t, 45)
+		t = a[22] ^ d2
+		bc4 = bits.RotateLeft64(t, 61)
+		t = a[3] ^ d3
+		bc0 = bits.RotateLeft64(t, 28)
+		t = a[9] ^ d4
+		bc1 = bits.RotateLeft64(t, 20)
+		a[10] = bc0 ^ (bc2 &^ bc1)
+		a[16] = bc1 ^ (bc3 &^ bc2)
+		a[22] = bc2 ^ (bc4 &^ bc3)
+		a[3] = bc3 ^ (bc0 &^ bc4)
+		a[9] = bc4 ^ (bc1 &^ bc0)
 
-		tt0 = A[3] ^ A[8]
-		tt1 = A[13] ^ A[18]
-		tt0 ^= A[23] ^ tt1
-		tt0 = (tt0 << 1) | (tt0 >> 63)
-		tt2 = A[1] ^ A[6]
-		tt3 = A[11] ^ A[16]
-		tt0 ^= A[21]
-		tt2 ^= tt3
-		t2 = tt0 ^ tt2
+		t = a[20] ^ d0
+		bc4 = bits.RotateLeft64(t, 18)
+		t = a[1] ^ d1
+		bc0 = bits.RotateLeft64(t, 1)
+		t = a[7] ^ d2
+		bc1 = bits.RotateLeft64(t, 6)
+		t = a[13] ^ d3
+		bc2 = bits.RotateLeft64(t, 25)
+		t = a[19] ^ d4
+		bc3 = bits.RotateLeft64(t, 8)
+		a[20] = bc0 ^ (bc2 &^ bc1)
+		a[1] = bc1 ^ (bc3 &^ bc2)
+		a[7] = bc2 ^ (bc4 &^ bc3)
+		a[13] = bc3 ^ (bc0 &^ bc4)
+		a[19] = bc4 ^ (bc1 &^ bc0)
 
-		tt0 = A[4] ^ A[9]
-		tt1 = A[14] ^ A[19]
-		tt0 ^= A[24] ^ tt1
-		tt0 = (tt0 << 1) | (tt0 >> 63)
-		tt2 = A[2] ^ A[7]
-		tt3 = A[12] ^ A[17]
-		tt0 ^= A[22]
-		tt2 ^= tt3
-		t3 = tt0 ^ tt2
+		t = a[5] ^ d0
+		bc1 = bits.RotateLeft64(t, 36)
+		t = a[11] ^ d1
+		bc2 = bits.RotateLeft64(t, 10)
+		t = a[17] ^ d2
+		bc3 = bits.RotateLeft64(t, 15)
+		t = a[23] ^ d3
+		bc4 = bits.RotateLeft64(t, 56)
+		t = a[4] ^ d4
+		bc0 = bits.RotateLeft64(t, 27)
+		a[5] = bc0 ^ (bc2 &^ bc1)
+		a[11] = bc1 ^ (bc3 &^ bc2)
+		a[17] = bc2 ^ (bc4 &^ bc3)
+		a[23] = bc3 ^ (bc0 &^ bc4)
+		a[4] = bc4 ^ (bc1 &^ bc0)
 
-		tt0 = A[0] ^ A[5]
-		tt1 = A[10] ^ A[15]
-		tt0 ^= A[20] ^ tt1
-		tt0 = (tt0 << 1) | (tt0 >> 63)
-		tt2 = A[3] ^ A[8]
-		tt3 = A[13] ^ A[18]
-		tt0 ^= A[23]
-		tt2 ^= tt3
-		t4 = tt0 ^ tt2
+		t = a[15] ^ d0
+		bc3 = bits.RotateLeft64(t, 41)
+		t = a[21] ^ d1
+		bc4 = bits.RotateLeft64(t, 2)
+		t = a[2] ^ d2
+		bc0 = bits.RotateLeft64(t, 62)
+		t = a[8] ^ d3
+		bc1 = bits.RotateLeft64(t, 55)
+		t = a[14] ^ d4
+		bc2 = bits.RotateLeft64(t, 39)
+		a[15] = bc0 ^ (bc2 &^ bc1)
+		a[21] = bc1 ^ (bc3 &^ bc2)
+		a[2] = bc2 ^ (bc4 &^ bc3)
+		a[8] = bc3 ^ (bc0 &^ bc4)
+		a[14] = bc4 ^ (bc1 &^ bc0)
 
-		A[0] = A[0] ^ t0
-		A[5] = A[5] ^ t0
-		A[10] = A[10] ^ t0
-		A[15] = A[15] ^ t0
-		A[20] = A[20] ^ t0
-		A[1] = A[1] ^ t1
-		A[6] = A[6] ^ t1
-		A[11] = A[11] ^ t1
-		A[16] = A[16] ^ t1
-		A[21] = A[21] ^ t1
-		A[2] = A[2] ^ t2
-		A[7] = A[7] ^ t2
-		A[12] = A[12] ^ t2
-		A[17] = A[17] ^ t2
-		A[22] = A[22] ^ t2
-		A[3] = A[3] ^ t3
-		A[8] = A[8] ^ t3
-		A[13] = A[13] ^ t3
-		A[18] = A[18] ^ t3
-		A[23] = A[23] ^ t3
-		A[4] = A[4] ^ t4
-		A[9] = A[9] ^ t4
-		A[14] = A[14] ^ t4
-		A[19] = A[19] ^ t4
-		A[24] = A[24] ^ t4
-		A[5] = (A[5] << 36) | (A[5] >> (64 - 36))
-		A[10] = (A[10] << 3) | (A[10] >> (64 - 3))
-		A[15] = (A[15] << 41) | (A[15] >> (64 - 41))
-		A[20] = (A[20] << 18) | (A[20] >> (64 - 18))
-		A[1] = (A[1] << 1) | (A[1] >> (64 - 1))
-		A[6] = (A[6] << 44) | (A[6] >> (64 - 44))
-		A[11] = (A[11] << 10) | (A[11] >> (64 - 10))
-		A[16] = (A[16] << 45) | (A[16] >> (64 - 45))
-		A[21] = (A[21] << 2) | (A[21] >> (64 - 2))
-		A[2] = (A[2] << 62) | (A[2] >> (64 - 62))
-		A[7] = (A[7] << 6) | (A[7] >> (64 - 6))
-		A[12] = (A[12] << 43) | (A[12] >> (64 - 43))
-		A[17] = (A[17] << 15) | (A[17] >> (64 - 15))
-		A[22] = (A[22] << 61) | (A[22] >> (64 - 61))
-		A[3] = (A[3] << 28) | (A[3] >> (64 - 28))
-		A[8] = (A[8] << 55) | (A[8] >> (64 - 55))
-		A[13] = (A[13] << 25) | (A[13] >> (64 - 25))
-		A[18] = (A[18] << 21) | (A[18] >> (64 - 21))
-		A[23] = (A[23] << 56) | (A[23] >> (64 - 56))
-		A[4] = (A[4] << 27) | (A[4] >> (64 - 27))
-		A[9] = (A[9] << 20) | (A[9] >> (64 - 20))
-		A[14] = (A[14] << 39) | (A[14] >> (64 - 39))
-		A[19] = (A[19] << 8) | (A[19] >> (64 - 8))
-		A[24] = (A[24] << 14) | (A[24] >> (64 - 14))
+		// Round 2
+		bc0 = a[0] ^ a[5] ^ a[10] ^ a[15] ^ a[20]
+		bc1 = a[1] ^ a[6] ^ a[11] ^ a[16] ^ a[21]
+		bc2 = a[2] ^ a[7] ^ a[12] ^ a[17] ^ a[22]
+		bc3 = a[3] ^ a[8] ^ a[13] ^ a[18] ^ a[23]
+		bc4 = a[4] ^ a[9] ^ a[14] ^ a[19] ^ a[24]
+		d0 = bc4 ^ (bc1<<1 | bc1>>63)
+		d1 = bc0 ^ (bc2<<1 | bc2>>63)
+		d2 = bc1 ^ (bc3<<1 | bc3>>63)
+		d3 = bc2 ^ (bc4<<1 | bc4>>63)
+		d4 = bc3 ^ (bc0<<1 | bc0>>63)
 
-		bnn = 0 - A[12] - 1 //~
-		kt = A[6] | A[12]
-		c0 = A[0] ^ kt
-		kt = bnn | A[18]
-		c1 = A[6] ^ kt
-		kt = A[18] & A[24]
-		c2 = A[12] ^ kt
-		kt = A[24] | A[0]
-		c3 = A[18] ^ kt
-		kt = A[0] & A[6]
-		c4 = A[24] ^ kt
-		A[0] = c0
-		A[6] = c1
-		A[12] = c2
-		A[18] = c3
-		A[24] = c4
-		bnn = 0 - A[22] - 1 //~
-		kt = A[9] | A[10]
-		c0 = A[3] ^ kt
-		kt = A[10] & A[16]
-		c1 = A[9] ^ kt
-		kt = A[16] | bnn
-		c2 = A[10] ^ kt
-		kt = A[22] | A[3]
-		c3 = A[16] ^ kt
-		kt = A[3] & A[9]
-		c4 = A[22] ^ kt
-		A[3] = c0
-		A[9] = c1
-		A[10] = c2
-		A[16] = c3
-		A[22] = c4
-		bnn = 0 - A[19] - 1 //~
-		kt = A[7] | A[13]
-		c0 = A[1] ^ kt
-		kt = A[13] & A[19]
-		c1 = A[7] ^ kt
-		kt = bnn & A[20]
-		c2 = A[13] ^ kt
-		kt = A[20] | A[1]
-		c3 = bnn ^ kt
-		kt = A[1] & A[7]
-		c4 = A[20] ^ kt
-		A[1] = c0
-		A[7] = c1
-		A[13] = c2
-		A[19] = c3
-		A[20] = c4
-		bnn = 0 - A[17] - 1 //~
-		kt = A[5] & A[11]
-		c0 = A[4] ^ kt
-		kt = A[11] | A[17]
-		c1 = A[5] ^ kt
-		kt = bnn | A[23]
-		c2 = A[11] ^ kt
-		kt = A[23] & A[4]
-		c3 = bnn ^ kt
-		kt = A[4] | A[5]
-		c4 = A[23] ^ kt
-		A[4] = c0
-		A[5] = c1
-		A[11] = c2
-		A[17] = c3
-		A[23] = c4
-		bnn = 0 - A[8] - 1 //~
-		kt = bnn & A[14]
-		c0 = A[2] ^ kt
-		kt = A[14] | A[15]
-		c1 = bnn ^ kt
-		kt = A[15] & A[21]
-		c2 = A[14] ^ kt
-		kt = A[21] | A[2]
-		c3 = A[15] ^ kt
-		kt = A[2] & A[8]
-		c4 = A[21] ^ kt
-		A[2] = c0
-		A[8] = c1
-		A[14] = c2
-		A[15] = c3
-		A[21] = c4
-		A[0] = A[0] ^ RC[j+0]
+		bc0 = a[0] ^ d0
+		t = a[16] ^ d1
+		bc1 = bits.RotateLeft64(t, 44)
+		t = a[7] ^ d2
+		bc2 = bits.RotateLeft64(t, 43)
+		t = a[23] ^ d3
+		bc3 = bits.RotateLeft64(t, 21)
+		t = a[14] ^ d4
+		bc4 = bits.RotateLeft64(t, 14)
+		a[0] = bc0 ^ (bc2 &^ bc1) ^ rc[i+1]
+		a[16] = bc1 ^ (bc3 &^ bc2)
+		a[7] = bc2 ^ (bc4 &^ bc3)
+		a[23] = bc3 ^ (bc0 &^ bc4)
+		a[14] = bc4 ^ (bc1 &^ bc0)
 
-		tt0 = A[6] ^ A[9]
-		tt1 = A[7] ^ A[5]
-		tt0 ^= A[8] ^ tt1
-		tt0 = (tt0 << 1) | (tt0 >> 63)
-		tt2 = A[24] ^ A[22]
-		tt3 = A[20] ^ A[23]
-		tt0 ^= A[21]
-		tt2 ^= tt3
-		t0 = tt0 ^ tt2
+		t = a[20] ^ d0
+		bc2 = bits.RotateLeft64(t, 3)
+		t = a[11] ^ d1
+		bc3 = bits.RotateLeft64(t, 45)
+		t = a[2] ^ d2
+		bc4 = bits.RotateLeft64(t, 61)
+		t = a[18] ^ d3
+		bc0 = bits.RotateLeft64(t, 28)
+		t = a[9] ^ d4
+		bc1 = bits.RotateLeft64(t, 20)
+		a[20] = bc0 ^ (bc2 &^ bc1)
+		a[11] = bc1 ^ (bc3 &^ bc2)
+		a[2] = bc2 ^ (bc4 &^ bc3)
+		a[18] = bc3 ^ (bc0 &^ bc4)
+		a[9] = bc4 ^ (bc1 &^ bc0)
 
-		tt0 = A[12] ^ A[10]
-		tt1 = A[13] ^ A[11]
-		tt0 ^= A[14] ^ tt1
-		tt0 = (tt0 << 1) | (tt0 >> 63)
-		tt2 = A[0] ^ A[3]
-		tt3 = A[1] ^ A[4]
-		tt0 ^= A[2]
-		tt2 ^= tt3
-		t1 = tt0 ^ tt2
+		t = a[15] ^ d0
+		bc4 = bits.RotateLeft64(t, 18)
+		t = a[6] ^ d1
+		bc0 = bits.RotateLeft64(t, 1)
+		t = a[22] ^ d2
+		bc1 = bits.RotateLeft64(t, 6)
+		t = a[13] ^ d3
+		bc2 = bits.RotateLeft64(t, 25)
+		t = a[4] ^ d4
+		bc3 = bits.RotateLeft64(t, 8)
+		a[15] = bc0 ^ (bc2 &^ bc1)
+		a[6] = bc1 ^ (bc3 &^ bc2)
+		a[22] = bc2 ^ (bc4 &^ bc3)
+		a[13] = bc3 ^ (bc0 &^ bc4)
+		a[4] = bc4 ^ (bc1 &^ bc0)
 
-		tt0 = A[18] ^ A[16]
-		tt1 = A[19] ^ A[17]
-		tt0 ^= A[15] ^ tt1
-		tt0 = (tt0 << 1) | (tt0 >> 63)
-		tt2 = A[6] ^ A[9]
-		tt3 = A[7] ^ A[5]
-		tt0 ^= A[8]
-		tt2 ^= tt3
-		t2 = tt0 ^ tt2
+		t = a[10] ^ d0
+		bc1 = bits.RotateLeft64(t, 36)
+		t = a[1] ^ d1
+		bc2 = bits.RotateLeft64(t, 10)
+		t = a[17] ^ d2
+		bc3 = bits.RotateLeft64(t, 15)
+		t = a[8] ^ d3
+		bc4 = bits.RotateLeft64(t, 56)
+		t = a[24] ^ d4
+		bc0 = bits.RotateLeft64(t, 27)
+		a[10] = bc0 ^ (bc2 &^ bc1)
+		a[1] = bc1 ^ (bc3 &^ bc2)
+		a[17] = bc2 ^ (bc4 &^ bc3)
+		a[8] = bc3 ^ (bc0 &^ bc4)
+		a[24] = bc4 ^ (bc1 &^ bc0)
 
-		tt0 = A[24] ^ A[22]
-		tt1 = A[20] ^ A[23]
-		tt0 ^= A[21] ^ tt1
-		tt0 = (tt0 << 1) | (tt0 >> 63)
-		tt2 = A[12] ^ A[10]
-		tt3 = A[13] ^ A[11]
-		tt0 ^= A[14]
-		tt2 ^= tt3
-		t3 = tt0 ^ tt2
+		t = a[5] ^ d0
+		bc3 = bits.RotateLeft64(t, 41)
+		t = a[21] ^ d1
+		bc4 = bits.RotateLeft64(t, 2)
+		t = a[12] ^ d2
+		bc0 = bits.RotateLeft64(t, 62)
+		t = a[3] ^ d3
+		bc1 = bits.RotateLeft64(t, 55)
+		t = a[19] ^ d4
+		bc2 = bits.RotateLeft64(t, 39)
+		a[5] = bc0 ^ (bc2 &^ bc1)
+		a[21] = bc1 ^ (bc3 &^ bc2)
+		a[12] = bc2 ^ (bc4 &^ bc3)
+		a[3] = bc3 ^ (bc0 &^ bc4)
+		a[19] = bc4 ^ (bc1 &^ bc0)
 
-		tt0 = A[0] ^ A[3]
-		tt1 = A[1] ^ A[4]
-		tt0 ^= A[2] ^ tt1
-		tt0 = (tt0 << 1) | (tt0 >> 63)
-		tt2 = A[18] ^ A[16]
-		tt3 = A[19] ^ A[17]
-		tt0 ^= A[15]
-		tt2 ^= tt3
-		t4 = tt0 ^ tt2
+		// Round 3
+		bc0 = a[0] ^ a[5] ^ a[10] ^ a[15] ^ a[20]
+		bc1 = a[1] ^ a[6] ^ a[11] ^ a[16] ^ a[21]
+		bc2 = a[2] ^ a[7] ^ a[12] ^ a[17] ^ a[22]
+		bc3 = a[3] ^ a[8] ^ a[13] ^ a[18] ^ a[23]
+		bc4 = a[4] ^ a[9] ^ a[14] ^ a[19] ^ a[24]
+		d0 = bc4 ^ (bc1<<1 | bc1>>63)
+		d1 = bc0 ^ (bc2<<1 | bc2>>63)
+		d2 = bc1 ^ (bc3<<1 | bc3>>63)
+		d3 = bc2 ^ (bc4<<1 | bc4>>63)
+		d4 = bc3 ^ (bc0<<1 | bc0>>63)
 
-		A[0] = A[0] ^ t0
-		A[3] = A[3] ^ t0
-		A[1] = A[1] ^ t0
-		A[4] = A[4] ^ t0
-		A[2] = A[2] ^ t0
-		A[6] = A[6] ^ t1
-		A[9] = A[9] ^ t1
-		A[7] = A[7] ^ t1
-		A[5] = A[5] ^ t1
-		A[8] = A[8] ^ t1
-		A[12] = A[12] ^ t2
-		A[10] = A[10] ^ t2
-		A[13] = A[13] ^ t2
-		A[11] = A[11] ^ t2
-		A[14] = A[14] ^ t2
-		A[18] = A[18] ^ t3
-		A[16] = A[16] ^ t3
-		A[19] = A[19] ^ t3
-		A[17] = A[17] ^ t3
-		A[15] = A[15] ^ t3
-		A[24] = A[24] ^ t4
-		A[22] = A[22] ^ t4
-		A[20] = A[20] ^ t4
-		A[23] = A[23] ^ t4
-		A[21] = A[21] ^ t4
-		A[3] = (A[3] << 36) | (A[3] >> (64 - 36))
-		A[1] = (A[1] << 3) | (A[1] >> (64 - 3))
-		A[4] = (A[4] << 41) | (A[4] >> (64 - 41))
-		A[2] = (A[2] << 18) | (A[2] >> (64 - 18))
-		A[6] = (A[6] << 1) | (A[6] >> (64 - 1))
-		A[9] = (A[9] << 44) | (A[9] >> (64 - 44))
-		A[7] = (A[7] << 10) | (A[7] >> (64 - 10))
-		A[5] = (A[5] << 45) | (A[5] >> (64 - 45))
-		A[8] = (A[8] << 2) | (A[8] >> (64 - 2))
-		A[12] = (A[12] << 62) | (A[12] >> (64 - 62))
-		A[10] = (A[10] << 6) | (A[10] >> (64 - 6))
-		A[13] = (A[13] << 43) | (A[13] >> (64 - 43))
-		A[11] = (A[11] << 15) | (A[11] >> (64 - 15))
-		A[14] = (A[14] << 61) | (A[14] >> (64 - 61))
-		A[18] = (A[18] << 28) | (A[18] >> (64 - 28))
-		A[16] = (A[16] << 55) | (A[16] >> (64 - 55))
-		A[19] = (A[19] << 25) | (A[19] >> (64 - 25))
-		A[17] = (A[17] << 21) | (A[17] >> (64 - 21))
-		A[15] = (A[15] << 56) | (A[15] >> (64 - 56))
-		A[24] = (A[24] << 27) | (A[24] >> (64 - 27))
-		A[22] = (A[22] << 20) | (A[22] >> (64 - 20))
-		A[20] = (A[20] << 39) | (A[20] >> (64 - 39))
-		A[23] = (A[23] << 8) | (A[23] >> (64 - 8))
-		A[21] = (A[21] << 14) | (A[21] >> (64 - 14))
+		bc0 = a[0] ^ d0
+		t = a[11] ^ d1
+		bc1 = bits.RotateLeft64(t, 44)
+		t = a[22] ^ d2
+		bc2 = bits.RotateLeft64(t, 43)
+		t = a[8] ^ d3
+		bc3 = bits.RotateLeft64(t, 21)
+		t = a[19] ^ d4
+		bc4 = bits.RotateLeft64(t, 14)
+		a[0] = bc0 ^ (bc2 &^ bc1) ^ rc[i+2]
+		a[11] = bc1 ^ (bc3 &^ bc2)
+		a[22] = bc2 ^ (bc4 &^ bc3)
+		a[8] = bc3 ^ (bc0 &^ bc4)
+		a[19] = bc4 ^ (bc1 &^ bc0)
 
-		bnn = 0 - A[13] - 1 //~
-		kt = A[9] | A[13]
-		c0 = A[0] ^ kt
-		kt = bnn | A[17]
-		c1 = A[9] ^ kt
-		kt = A[17] & A[21]
-		c2 = A[13] ^ kt
-		kt = A[21] | A[0]
-		c3 = A[17] ^ kt
-		kt = A[0] & A[9]
-		c4 = A[21] ^ kt
-		A[0] = c0
-		A[9] = c1
-		A[13] = c2
-		A[17] = c3
-		A[21] = c4
-		bnn = 0 - A[14] - 1 //~
-		kt = A[22] | A[1]
-		c0 = A[18] ^ kt
-		kt = A[1] & A[5]
-		c1 = A[22] ^ kt
-		kt = A[5] | bnn
-		c2 = A[1] ^ kt
-		kt = A[14] | A[18]
-		c3 = A[5] ^ kt
-		kt = A[18] & A[22]
-		c4 = A[14] ^ kt
-		A[18] = c0
-		A[22] = c1
-		A[1] = c2
-		A[5] = c3
-		A[14] = c4
-		bnn = 0 - A[23] - 1 //~
-		kt = A[10] | A[19]
-		c0 = A[6] ^ kt
-		kt = A[19] & A[23]
-		c1 = A[10] ^ kt
-		kt = bnn & A[2]
-		c2 = A[19] ^ kt
-		kt = A[2] | A[6]
-		c3 = bnn ^ kt
-		kt = A[6] & A[10]
-		c4 = A[2] ^ kt
-		A[6] = c0
-		A[10] = c1
-		A[19] = c2
-		A[23] = c3
-		A[2] = c4
-		bnn = 0 - A[11] - 1 //~
-		kt = A[3] & A[7]
-		c0 = A[24] ^ kt
-		kt = A[7] | A[11]
-		c1 = A[3] ^ kt
-		kt = bnn | A[15]
-		c2 = A[7] ^ kt
-		kt = A[15] & A[24]
-		c3 = bnn ^ kt
-		kt = A[24] | A[3]
-		c4 = A[15] ^ kt
-		A[24] = c0
-		A[3] = c1
-		A[7] = c2
-		A[11] = c3
-		A[15] = c4
-		bnn = 0 - A[16] - 1 //~
-		kt = bnn & A[20]
-		c0 = A[12] ^ kt
-		kt = A[20] | A[4]
-		c1 = bnn ^ kt
-		kt = A[4] & A[8]
-		c2 = A[20] ^ kt
-		kt = A[8] | A[12]
-		c3 = A[4] ^ kt
-		kt = A[12] & A[16]
-		c4 = A[8] ^ kt
-		A[12] = c0
-		A[16] = c1
-		A[20] = c2
-		A[4] = c3
-		A[8] = c4
-		A[0] = A[0] ^ RC[j+1]
-		t = A[5]
-		A[5] = A[18]
-		A[18] = A[11]
-		A[11] = A[10]
-		A[10] = A[6]
-		A[6] = A[22]
-		A[22] = A[20]
-		A[20] = A[12]
-		A[12] = A[19]
-		A[19] = A[15]
-		A[15] = A[24]
-		A[24] = A[8]
-		A[8] = t
-		t = A[1]
-		A[1] = A[9]
-		A[9] = A[14]
-		A[14] = A[2]
-		A[2] = A[13]
-		A[13] = A[23]
-		A[23] = A[4]
-		A[4] = A[21]
-		A[21] = A[16]
-		A[16] = A[3]
-		A[3] = A[17]
-		A[17] = A[7]
-		A[7] = t
+		t = a[15] ^ d0
+		bc2 = bits.RotateLeft64(t, 3)
+		t = a[1] ^ d1
+		bc3 = bits.RotateLeft64(t, 45)
+		t = a[12] ^ d2
+		bc4 = bits.RotateLeft64(t, 61)
+		t = a[23] ^ d3
+		bc0 = bits.RotateLeft64(t, 28)
+		t = a[9] ^ d4
+		bc1 = bits.RotateLeft64(t, 20)
+		a[15] = bc0 ^ (bc2 &^ bc1)
+		a[1] = bc1 ^ (bc3 &^ bc2)
+		a[12] = bc2 ^ (bc4 &^ bc3)
+		a[23] = bc3 ^ (bc0 &^ bc4)
+		a[9] = bc4 ^ (bc1 &^ bc0)
+
+		t = a[5] ^ d0
+		bc4 = bits.RotateLeft64(t, 18)
+		t = a[16] ^ d1
+		bc0 = bits.RotateLeft64(t, 1)
+		t = a[2] ^ d2
+		bc1 = bits.RotateLeft64(t, 6)
+		t = a[13] ^ d3
+		bc2 = bits.RotateLeft64(t, 25)
+		t = a[24] ^ d4
+		bc3 = bits.RotateLeft64(t, 8)
+		a[5] = bc0 ^ (bc2 &^ bc1)
+		a[16] = bc1 ^ (bc3 &^ bc2)
+		a[2] = bc2 ^ (bc4 &^ bc3)
+		a[13] = bc3 ^ (bc0 &^ bc4)
+		a[24] = bc4 ^ (bc1 &^ bc0)
+
+		t = a[20] ^ d0
+		bc1 = bits.RotateLeft64(t, 36)
+		t = a[6] ^ d1
+		bc2 = bits.RotateLeft64(t, 10)
+		t = a[17] ^ d2
+		bc3 = bits.RotateLeft64(t, 15)
+		t = a[3] ^ d3
+		bc4 = bits.RotateLeft64(t, 56)
+		t = a[14] ^ d4
+		bc0 = bits.RotateLeft64(t, 27)
+		a[20] = bc0 ^ (bc2 &^ bc1)
+		a[6] = bc1 ^ (bc3 &^ bc2)
+		a[17] = bc2 ^ (bc4 &^ bc3)
+		a[3] = bc3 ^ (bc0 &^ bc4)
+		a[14] = bc4 ^ (bc1 &^ bc0)
+
+		t = a[10] ^ d0
+		bc3 = bits.RotateLeft64(t, 41)
+		t = a[21] ^ d1
+		bc4 = bits.RotateLeft64(t, 2)
+		t = a[7] ^ d2
+		bc0 = bits.RotateLeft64(t, 62)
+		t = a[18] ^ d3
+		bc1 = bits.RotateLeft64(t, 55)
+		t = a[4] ^ d4
+		bc2 = bits.RotateLeft64(t, 39)
+		a[10] = bc0 ^ (bc2 &^ bc1)
+		a[21] = bc1 ^ (bc3 &^ bc2)
+		a[7] = bc2 ^ (bc4 &^ bc3)
+		a[18] = bc3 ^ (bc0 &^ bc4)
+		a[4] = bc4 ^ (bc1 &^ bc0)
+
+		// Round 4
+		bc0 = a[0] ^ a[5] ^ a[10] ^ a[15] ^ a[20]
+		bc1 = a[1] ^ a[6] ^ a[11] ^ a[16] ^ a[21]
+		bc2 = a[2] ^ a[7] ^ a[12] ^ a[17] ^ a[22]
+		bc3 = a[3] ^ a[8] ^ a[13] ^ a[18] ^ a[23]
+		bc4 = a[4] ^ a[9] ^ a[14] ^ a[19] ^ a[24]
+		d0 = bc4 ^ (bc1<<1 | bc1>>63)
+		d1 = bc0 ^ (bc2<<1 | bc2>>63)
+		d2 = bc1 ^ (bc3<<1 | bc3>>63)
+		d3 = bc2 ^ (bc4<<1 | bc4>>63)
+		d4 = bc3 ^ (bc0<<1 | bc0>>63)
+
+		bc0 = a[0] ^ d0
+		t = a[1] ^ d1
+		bc1 = bits.RotateLeft64(t, 44)
+		t = a[2] ^ d2
+		bc2 = bits.RotateLeft64(t, 43)
+		t = a[3] ^ d3
+		bc3 = bits.RotateLeft64(t, 21)
+		t = a[4] ^ d4
+		bc4 = bits.RotateLeft64(t, 14)
+		a[0] = bc0 ^ (bc2 &^ bc1) ^ rc[i+3]
+		a[1] = bc1 ^ (bc3 &^ bc2)
+		a[2] = bc2 ^ (bc4 &^ bc3)
+		a[3] = bc3 ^ (bc0 &^ bc4)
+		a[4] = bc4 ^ (bc1 &^ bc0)
+
+		t = a[5] ^ d0
+		bc2 = bits.RotateLeft64(t, 3)
+		t = a[6] ^ d1
+		bc3 = bits.RotateLeft64(t, 45)
+		t = a[7] ^ d2
+		bc4 = bits.RotateLeft64(t, 61)
+		t = a[8] ^ d3
+		bc0 = bits.RotateLeft64(t, 28)
+		t = a[9] ^ d4
+		bc1 = bits.RotateLeft64(t, 20)
+		a[5] = bc0 ^ (bc2 &^ bc1)
+		a[6] = bc1 ^ (bc3 &^ bc2)
+		a[7] = bc2 ^ (bc4 &^ bc3)
+		a[8] = bc3 ^ (bc0 &^ bc4)
+		a[9] = bc4 ^ (bc1 &^ bc0)
+
+		t = a[10] ^ d0
+		bc4 = bits.RotateLeft64(t, 18)
+		t = a[11] ^ d1
+		bc0 = bits.RotateLeft64(t, 1)
+		t = a[12] ^ d2
+		bc1 = bits.RotateLeft64(t, 6)
+		t = a[13] ^ d3
+		bc2 = bits.RotateLeft64(t, 25)
+		t = a[14] ^ d4
+		bc3 = bits.RotateLeft64(t, 8)
+		a[10] = bc0 ^ (bc2 &^ bc1)
+		a[11] = bc1 ^ (bc3 &^ bc2)
+		a[12] = bc2 ^ (bc4 &^ bc3)
+		a[13] = bc3 ^ (bc0 &^ bc4)
+		a[14] = bc4 ^ (bc1 &^ bc0)
+
+		t = a[15] ^ d0
+		bc1 = bits.RotateLeft64(t, 36)
+		t = a[16] ^ d1
+		bc2 = bits.RotateLeft64(t, 10)
+		t = a[17] ^ d2
+		bc3 = bits.RotateLeft64(t, 15)
+		t = a[18] ^ d3
+		bc4 = bits.RotateLeft64(t, 56)
+		t = a[19] ^ d4
+		bc0 = bits.RotateLeft64(t, 27)
+		a[15] = bc0 ^ (bc2 &^ bc1)
+		a[16] = bc1 ^ (bc3 &^ bc2)
+		a[17] = bc2 ^ (bc4 &^ bc3)
+		a[18] = bc3 ^ (bc0 &^ bc4)
+		a[19] = bc4 ^ (bc1 &^ bc0)
+
+		t = a[20] ^ d0
+		bc3 = bits.RotateLeft64(t, 41)
+		t = a[21] ^ d1
+		bc4 = bits.RotateLeft64(t, 2)
+		t = a[22] ^ d2
+		bc0 = bits.RotateLeft64(t, 62)
+		t = a[23] ^ d3
+		bc1 = bits.RotateLeft64(t, 55)
+		t = a[24] ^ d4
+		bc2 = bits.RotateLeft64(t, 39)
+		a[20] = bc0 ^ (bc2 &^ bc1)
+		a[21] = bc1 ^ (bc3 &^ bc2)
+		a[22] = bc2 ^ (bc4 &^ bc3)
+		a[23] = bc3 ^ (bc0 &^ bc4)
+		a[24] = bc4 ^ (bc1 &^ bc0)
 	}
-
-	/*
-	 * Invert some words back to normal representation.
-	 */
-	//~x = -x - 1
-	A[1] = 0 - A[1] - 1
-	A[2] = 0 - A[2] - 1
-	A[8] = 0 - A[8] - 1
-	A[12] = 0 - A[12] - 1
-	A[17] = 0 - A[17] - 1
-	A[20] = 0 - A[20] - 1
 }
 
 var (
@@ -706,12 +664,8 @@ func (privKey *PrivateKey) hashToPoint(message []byte, salt []byte) []float64 {
 //hashToPoint but uses type PublicKey as an assiciator
 //type converted from []float64 to []int16
 
-/*func (pubKey *PublicKey) hashToPoint(message []byte, salt []byte) []int16 {
-	if util.Q > (1 << 16) {
-		panic("Q is too large")
-	}
+func (pubKey *PublicKey) hashToPoint(message []byte, salt []byte) []int16 {
 
-	k := (1 << 16) / util.Q
 	// Create a SHAKE256 object and hash the salt and message
 	shake := sha3.NewShake256()
 	shake.Write(salt)
@@ -719,51 +673,32 @@ func (privKey *PrivateKey) hashToPoint(message []byte, salt []byte) []float64 {
 	// Output pseudo-random bytes and map them to coefficients
 	hashed := make([]int16, pubKey.n)
 	i := 0
-	j := 0
+
 	for i < int(pubKey.n) {
 		//take two bytes, transform into int16
 		//couldn't find shake.Read() definition?
 		var buf [2]byte
 		shake.Read(buf[:])
 		// Map the bytes to coefficients
-		elt := (int(buf[0]) << 8) + int(buf[1])
+		elt := (int(buf[0]) << 8) | int(buf[1])
 		// Implicit rejection sampling
-		if elt < k*util.Q {
+		if elt < 61445 {
 			hashed[i] = int16(elt % util.Q)
 			i++
 		}
-		j++
+
 	}
 	return hashed
-}*/
-
-/*func bytesToUint64s(buf []byte) uint64 {
-	i := uint64(binary.LittleEndian.Uint64(buf))
-	return i
 }
 
-func uint64sToBytes(buf uint64) []byte {
-	r := make([]byte, 8)
-	binary.LittleEndian.PutUint64(r, buf)
-	return r
-}*/
-
-const (
+/*const (
 	maxRate = 136
 )
-
-type storageBuf [maxRate]byte
-
-func (b *storageBuf) asBytes() *[maxRate]byte {
-	return (*[maxRate]byte)(b)
-}
 
 type inner_shake256_context struct {
 	A    [25]uint64
 	dbuf []uint8 //points into storage
-
-	storage storageBuf //storage max size is 168 in crypto/x/sha3, in C it's 136
-	dptr    int
+	dptr int     // points at the current position in dbuf
 }
 
 // (reference to sha3 library)
@@ -786,65 +721,30 @@ func copyOutGeneric(d *inner_shake256_context, b []byte) {
 }
 
 func (sc *inner_shake256_context) shake256_init() {
-	sc.dptr = 0
 	//memset(sc->st.A, 0, sizeof sc->st.A);
+	sc.dptr = 0
 	for j := range sc.A {
 		sc.A[j] = 0
 	}
-	sc.dbuf = sc.storage.asBytes()[:0]
 }
 
-/*func (sc *inner_shake256_context) shake256_inject(message []uint8, message_len uint64) {
-	dptr := sc.dptr
-
-	for message_len > 0 {
-		var clen uint64
-		var u uint64
-
-		clen = 136 - dptr
-		if clen > message_len {
-			clen = message_len
-		}
-
-		for u = 0; u < clen; u++ {
-			sc.dbuf = append(sc.dbuf, message[u])
-		}
-
-		// #endif
-		dptr += clen
-		message_len -= clen
-		if dptr == 136 {
-			xorInGeneric(sc, sc.dbuf) //equivalent of permute function in sha3 library
-			process_block(&sc.A)
-			dptr = 0
-		}
-	}
-	sc.dptr = dptr
-}*/
-
-// similar to inject function
 func (d *inner_shake256_context) permute_inject() {
-
 	xorInGeneric(d, d.dbuf)
-	d.dbuf = d.storage.asBytes()[:0]
 	process_block(&d.A)
+	d.dptr = 0
 }
 
 func (d *inner_shake256_context) Write(p []byte) {
-
-	if d.dbuf == nil {
-		d.dbuf = d.storage.asBytes()[:0]
-	}
+	dptr := d.dptr
 
 	for len(p) > 0 {
 		if len(d.dbuf) == 0 && len(p) >= maxRate {
 			// The fast path; absorb a full "rate" bytes of input and apply the permutation.
 			xorInGeneric(d, p[:maxRate])
-			fmt.Println("xor pass")
 			p = p[maxRate:]
 			process_block(&d.A)
+			//ignores the byte buff
 		} else {
-
 			// The slow path; buffer the input until we can fill the sponge, and then xor it in.
 			todo := maxRate - len(d.dbuf)
 			if todo > len(p) {
@@ -852,18 +752,26 @@ func (d *inner_shake256_context) Write(p []byte) {
 			}
 			d.dbuf = append(d.dbuf, p[:todo]...)
 			p = p[todo:]
+			xorInGeneric(d, d.dbuf[dptr:dptr+todo])
+			dptr += todo
 
 			// If the sponge is full, apply the permutation.
 			if len(d.dbuf) == maxRate {
-				d.permute_inject()
+				process_block(&d.A)
+				d.dptr = 0
 			}
 		}
 	}
+
+	d.dptr = dptr
 }
 
 func (sc *inner_shake256_context) shake256_flip() {
+	for i := sc.dptr; i < maxRate; i++ {
+		sc.dbuf = append(sc.dbuf, 0)
+	}
 	copyOutGeneric(sc, sc.dbuf)
-	fmt.Println(sc.dbuf)
+	//fmt.Println(sc.dbuf)
 	sc.dbuf[sc.dptr] ^= 0x1F
 	sc.dbuf[maxRate-1] ^= 0x80
 	sc.dptr = 136
@@ -874,9 +782,10 @@ func (d *inner_shake256_context) Read(out *[2]byte) {
 	dptr := d.dptr
 	n := len(out)
 
-	for len(out) > 0 {
+	for n > 0 {
 		if dptr == 136 {
 			process_block(&d.A)
+			copyOutGeneric(d, d.dbuf)
 			dptr = 0
 		}
 		clen := 136 - dptr
@@ -885,50 +794,14 @@ func (d *inner_shake256_context) Read(out *[2]byte) {
 		}
 		n -= clen
 		for i := 0; i < clen; i++ {
-			out[i] = d.dbuf[i]
+			out[i] = d.dbuf[dptr+i]
 		}
-		d.dptr += clen
-		d.dbuf = d.dbuf[n:]
+		dptr += clen
+		//d.dbuf = d.dbuf[n:]
 		//out = out[n:]
 	}
 	d.dptr = dptr
 }
-
-/*func (sc *inner_shake256_context) shake256_extract(buf *[2]uint8, len uint64) {
-	dptr := sc.dptr
-	var index uint64
-
-	for len > 0 {
-
-		if dptr == 136 {
-			process_block(&sc.A)
-			dptr = 0
-		}
-
-		clen := 136 - dptr
-		if clen > len {
-			clen = len
-		}
-		len -= clen
-		sc.dbuf = sc.storage.asBytes()[:dptr+clen]
-		// #if
-		var i uint64
-		for i = 0; i < clen; i++ {
-			buf[i] = sc.dbuf[dptr+i]
-		}
-
-		//memcpy(out, sc->st.dbuf + dptr, clen);
-		dptr += clen
-		index += clen
-	}
-	sc.dptr = dptr
-}
-
-func (sc *inner_shake256_context) check() {
-	for i := 0; i < 200; i++ {
-		fmt.Println(sc.dbuf[i])
-	}
-}*/
 
 func (pubKey *PublicKey) hashToPoint(message []byte, salt []byte) []int16 {
 
@@ -938,24 +811,19 @@ func (pubKey *PublicKey) hashToPoint(message []byte, salt []byte) []int16 {
 	hd.shake256_init()
 	fmt.Println("init clear")
 	hd.Write(salt)
-	fmt.Println("inject clear")
+	fmt.Println("inject salt clear")
 	hd.Write(message)
-	fmt.Println("inject")
+	fmt.Println("inject message clear")
 	hd.shake256_flip()
 	fmt.Println("flip clear")
 
-	if util.Q > (1 << 16) {
-		panic("Q is too large")
-	}
-
-	k := (1 << 16) / util.Q
 	// Create a SHAKE256 object and hash the salt and message
 	/*shake := sha3.NewShake256()
 	shake.Write(salt)
 	shake.Write(message)*/
 
-	// Output pseudo-random bytes and map them to coefficients
-	hashed := make([]int16, pubKey.n)
+// Output pseudo-random bytes and map them to coefficients
+/*hashed := make([]int16, pubKey.n)
 	i := 0
 	for i < int(pubKey.n) {
 		//take two bytes, transform into int16
@@ -963,18 +831,19 @@ func (pubKey *PublicKey) hashToPoint(message []byte, salt []byte) []int16 {
 		hd.Read(&buf)
 		// Map the bytes to coefficients
 		elt := (uint32(buf[0]) << 8) | uint32(buf[1])
-		fmt.Println("first ", buf[0])
-		fmt.Println("second ", buf[1])
 
 		// Implicit rejection sampling
-		if elt < uint32(k*util.Q) {
-			hashed[i] = int16(elt % util.Q)
+		if elt < uint32(61445) {
+			for elt >= 12289 {
+				elt -= 12289
+			}
+			hashed[i] = int16(elt)
 			i++
 		}
 	}
 
 	return hashed
-}
+}*/
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -1052,7 +921,13 @@ func (pubKey *PublicKey) hashToPoint(message []byte, salt []byte) []int16 {
 }*/
 
 func (pubKey *PublicKey) Verify(message []byte, signature []byte) bool {
-	//checking
+
+	/*file, err := ioutil.ReadFile("hashedC.txt")
+
+	if err != nil {
+		fmt.Println("error opening hash value")
+	}*/
+
 	/*fmt.Println("\npubKey as list: ", pubKey.h)*/
 	fmt.Println("\nsignature as list: ", signature)
 
@@ -1060,10 +935,10 @@ func (pubKey *PublicKey) Verify(message []byte, signature []byte) bool {
 	encS := signature[HeadLen+SaltLen:]
 	PubParam := GetParamSet(pubKey.n)
 
-	/*fmt.Println("\nsalt: ", salt)
+	fmt.Println("\nsalt: ", salt)
 	fmt.Println("\nSaltLen: ", SaltLen)
 	fmt.Println("\nHeadLen: ", HeadLen)
-	fmt.Println("\nencS: ", encS)*/
+	fmt.Println("\nencS: ", encS)
 
 	var normSign uint32
 	normSign = 0
@@ -1089,40 +964,50 @@ func (pubKey *PublicKey) Verify(message []byte, signature []byte) bool {
 	// compute s0 and normalize its coefficients in (-q/2, q/2]
 	hashed := pubKey.hashToPoint(message, salt)
 	fmt.Println("\nhashed value: ", hashed)
+	fmt.Println("\nlength of the hashed value: ", len(hashed))
+
+	/*hashed = []int16{}
+
+	index := 0
+	h := strings.Split(string(file), "\n")
+	for _, l := range h {
+		bb := strings.NewReader(l)
+		scanner1 := bufio.NewScanner(bb)
+		scanner1.Split(bufio.ScanWords)
+		for scanner1.Scan() {
+			x, err := strconv.Atoi(scanner1.Text())
+			if err != nil {
+				fmt.Println("error in hash read")
+			}
+			hashed = append(hashed, int16(x))
+		}
+		index++
+	}
+
+	fmt.Println("'\nhashed read: ", hashed)*/
 
 	s0 := ntt.SubZq(hashed, ntt.MulZq(s1, pubKey.h))
-	/*fmt.Println("\ns0 before normalization: ", s0)
-	fmt.Println("\nQ: ", util.Q)*/
+	fmt.Println("\ns0 before normalization: ", s0)
+	//fmt.Println("\nQ: ", util.Q)
 
 	for i := 0; i < len(s0); i++ {
 		s0[i] = int16((s0[i]+(util.Q>>1))%util.Q - (util.Q >> 1))
 		//s0[i] = int16(uint32(s0[i]) + util.Q&-(uint32(s0[i])>>31))
+		//s0[i] -= int16(util.Q & -((util.Q >> 1) - uint32(s0[i])>>31))
 	}
 
-	/*for i := 0; i < len(s0); i++ {
-		s0[i] -= int16(util.Q & -((util.Q >> 1) - uint32(s0[i])>>31))
-		//s0[i] = int16(uint32(s0[i]) + util.Q&-(uint32(s0[i])>>31))
-	}*/
-
-	/*fmt.Println("\ns0: ", s0)*/
+	fmt.Println("\ns0: ", s0)
 
 	for _, v := range s0 {
 		normSign += uint32(v) * uint32(v)
-		//ng |= normSign
 	}
 	//fmt.Println("\ns0 sum: ", normSign)
 	for _, v := range s1 {
 		normSign += uint32(v) * uint32(v)
-		//ng |= normSign
 	}
-
-	//normSign |= -(ng >> 31)
 
 	fmt.Println("\nsignature bound: ", PubParam.sigbound)
 	fmt.Println("normSign: ", normSign)
-	var sss [2]int
-	sss[0] = 2
-	sss[1] = 99
 
 	if normSign > PubParam.sigbound {
 		return false

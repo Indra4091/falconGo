@@ -260,7 +260,7 @@ func TestSignVerify(t *testing.T) {
 			pub.h = append(pub.h, int16(x))
 		}
 
-		fmt.Println("publey: ", pub.h)
+		fmt.Println("pubkey: ", pub.h)
 
 		for i := 0; i < 1; i++ {
 			remainder := index % 10
