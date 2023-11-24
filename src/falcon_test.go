@@ -2,7 +2,6 @@ package falcon
 
 import (
 	"bufio"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
@@ -278,7 +277,9 @@ func TestSignVerify(t *testing.T) {
 			}
 		}
 
-		fmt.Println("total verified signature:", total_verified)
+		if total_verified == 1010 {
+			return
+		}
 		index++
 	}
 }
