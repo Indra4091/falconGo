@@ -4,7 +4,7 @@ import (
 	"errors"
 	"math"
 
-	"github.com/realForbis/go-falcon-WIP/src/util"
+	"github.com/Indra4091/falconGo/src/util"
 )
 
 //This file contains an implementation of the NTT.

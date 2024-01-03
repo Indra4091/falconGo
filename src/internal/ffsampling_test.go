@@ -5,8 +5,8 @@ import (
 	"reflect"
 	"testing"
 
-	kat "github.com/realForbis/go-falcon-WIP/src/internal/KAT"
-	"github.com/realForbis/go-falcon-WIP/src/internal/transforms/fft"
+	kat "github.com/Indra4091/falconGo/src/internal/KAT"
+	"github.com/Indra4091/falconGo/src/internal/transforms/fft"
 )
 
 var (

@@ -6,8 +6,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/realForbis/go-falcon-WIP/src/types"
-	"github.com/realForbis/go-falcon-WIP/src/util"
+	"github.com/Indra4091/falconGo/src/types"
+	"github.com/Indra4091/falconGo/src/util"
 )
 
 func TestKaratsuba(t *testing.T) {
@@ -244,5 +244,5 @@ func TestNtruGen(t *testing.T) {
 	var f, g, F, G []int16
 	var n uint16 = 64
 	f, g, F, G = NtruGen(n)
-	log.Println(f,g,F,G)
+	log.Println(f, g, F, G)
 }

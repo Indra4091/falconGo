@@ -5,9 +5,9 @@ import (
 	"math"
 	"math/big"
 
-	"github.com/realForbis/go-falcon-WIP/src/internal/transforms/fft"
-	"github.com/realForbis/go-falcon-WIP/src/internal/transforms/ntt"
-	"github.com/realForbis/go-falcon-WIP/src/util"
+	"github.com/Indra4091/falconGo/src/internal/transforms/fft"
+	"github.com/Indra4091/falconGo/src/internal/transforms/ntt"
+	"github.com/Indra4091/falconGo/src/util"
 )
 
 /*

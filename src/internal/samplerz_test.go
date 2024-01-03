@@ -3,7 +3,7 @@ package internal
 import (
 	"testing"
 
-	"github.com/realForbis/go-falcon-WIP/src/util"
+	"github.com/Indra4091/falconGo/src/util"
 )
 
 /*

@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"strings"
 
-	_ "github.com/realForbis/go-falcon-WIP/src/types"
+	_ "github.com/Indra4091/falconGo/src/types"
 )
 
 var (

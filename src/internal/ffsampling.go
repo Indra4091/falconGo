@@ -4,7 +4,7 @@ import (
 	"log"
 	"math"
 
-	"github.com/realForbis/go-falcon-WIP/src/internal/transforms/fft"
+	"github.com/Indra4091/falconGo/src/internal/transforms/fft"
 )
 
 /*

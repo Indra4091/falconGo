@@ -1,4 +1,4 @@
-module github.com/realForbis/go-falcon-WIP
+module github.com/Indra4091/falconGo
 
 go 1.19
 

@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	kat "github.com/realForbis/go-falcon-WIP/src/internal/KAT"
-	"github.com/realForbis/go-falcon-WIP/src/util"
+	kat "github.com/Indra4091/falconGo/src/internal/KAT"
+	"github.com/Indra4091/falconGo/src/util"
 )
 
 var (
