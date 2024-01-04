@@ -500,7 +500,7 @@ func (pubKey *PublicKey) Verify(message []byte, signature []byte) bool {
 	return true
 }
 
-func wrap() {
+func Wrapping() {
 	f, err1 := ioutil.ReadFile("messageC.txt")
 	s, err2 := ioutil.ReadFile("signatureC.txt")
 	th, err3 := ioutil.ReadFile("pubkeyC.txt")
