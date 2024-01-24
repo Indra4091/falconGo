@@ -1,14 +1,9 @@
 package falcon
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
-	"io/ioutil"
-	"log"
 	"math"
-	"strconv"
-	"strings"
 
 	"github.com/Indra4091/falconGo/src/internal"
 	"github.com/Indra4091/falconGo/src/internal/transforms/fft"
@@ -263,17 +258,18 @@ func (privKey *PrivateKey) hashToPoint(message []byte, salt []byte) []float64 {
 //hashToPoint but uses type PublicKey as an assiciator
 //type converted from []float64 to []int16
 
-func (pubKey *PublicKey) hashToPoint(message []byte, salt []byte) []int16 {
+func hashToPoint(message []byte, salt []byte) []int16 {
 
+	n := 512
 	// Create a SHAKE256 object and hash the salt and message
 	shake := sha3.NewShake256()
 	shake.Write(salt)
 	shake.Write(message)
 	// Output pseudo-random bytes and map them to coefficients
-	hashed := make([]int16, pubKey.n)
+	hashed := make([]int16, n)
 	i := 0
 
-	for i < int(pubKey.n) {
+	for i < int(n) {
 		//take two bytes, transform into int16
 		//couldn't find shake.Read() definition?
 		var buf [2]byte
@@ -445,14 +441,16 @@ func (pubKey *PublicKey) hashToPoint(message []byte, salt []byte) []int16 {
 }*/
 ///////////////////////////////////////////////////////////////////////////////
 
-func (pubKey *PublicKey) Verify(message []byte, signature []byte) bool {
+func Verify(pubkey []int16, message []byte, signature []byte) bool {
 
 	//fmt.Println("\nmsg: ", message)
 	//fmt.Println("\nsignature as list: ", signature)
+	n := 512
 
 	salt := signature[HeadLen : HeadLen+SaltLen]
 	encS := signature[HeadLen+SaltLen:]
-	PubParam := GetParamSet(pubKey.n)
+
+	PubParam := GetParamSet(uint16(n))
 
 	var normSign uint32
 	normSign = 0
@@ -461,7 +459,7 @@ func (pubKey *PublicKey) Verify(message []byte, signature []byte) bool {
 
 	var s1 []int16
 	// ss1 is dummy-array
-	ss1, err := internal.Decompress(encS, int(PubParam.sigbytelen-HeadLen-SaltLen), int(pubKey.n))
+	ss1, err := internal.Decompress(encS, int(PubParam.sigbytelen-HeadLen-SaltLen), int(n))
 
 	/*fmt.Println("\nsigPart s1: ", ss1)*/
 
@@ -475,8 +473,8 @@ func (pubKey *PublicKey) Verify(message []byte, signature []byte) bool {
 	}
 
 	// compute s0 and normalize its coefficients in (-q/2, q/2]
-	hashed := pubKey.hashToPoint(message, salt)
-	s0 := ntt.SubZq(hashed, ntt.MulZq(s1, pubKey.h))
+	hashed := hashToPoint(message, salt)
+	s0 := ntt.SubZq(hashed, ntt.MulZq(s1, pubkey))
 	//fmt.Println("\nQ: ", util.Q)
 
 	for i := 0; i < len(s0); i++ {
@@ -498,120 +496,4 @@ func (pubKey *PublicKey) Verify(message []byte, signature []byte) bool {
 		return false
 	}
 	return true
-}
-
-func Wrapping() {
-	f, err1 := ioutil.ReadFile("messageC.txt")
-	s, err2 := ioutil.ReadFile("signatureC.txt")
-	th, err3 := ioutil.ReadFile("pubkeyC.txt")
-
-	if err1 != nil {
-		log.Printf("couldn't read file")
-		return
-	}
-	if err2 != nil {
-		log.Printf("couldn't read file")
-		return
-	}
-	if err3 != nil {
-		log.Printf("couldn't read file")
-		return
-	}
-
-	n := 512
-	priv, err := GeneratePrivateKey(uint16(n))
-	if err != nil {
-		log.Printf("Error NewKeyPair: %v", err)
-		return
-	}
-	pub := priv.GetPublicKey()
-	pub.h = []int16{}
-
-	message := make([][]uint8, 10)
-	for i := 0; i < 10; i++ {
-		message[i] = make([]uint8, 0)
-	}
-
-	msgg := strings.Split(string(f), "\n")
-	index := 0
-	for _, l := range msgg {
-		bb := strings.NewReader(l)
-		scanner1 := bufio.NewScanner(bb)
-		scanner1.Split(bufio.ScanWords)
-		for scanner1.Scan() {
-			x, err := strconv.Atoi(scanner1.Text())
-			if err != nil {
-				log.Printf("error converting bytearray to signature")
-				return
-			}
-			message[index] = append(message[index], uint8(x))
-		}
-		index++
-	}
-
-	signature := make([][]uint8, 100)
-	for i := 0; i < 100; i++ {
-		signature[i] = make([]uint8, 0)
-	}
-
-	index = 0
-	read_lines := strings.Split(string(s), "\n")
-	for _, line := range read_lines {
-		if len(signature) == 0 {
-			log.Printf("index: %v\n", index)
-			break
-		}
-
-		r := strings.NewReader(line)
-		scanner := bufio.NewScanner(r)
-		scanner.Split(bufio.ScanWords)
-
-		for scanner.Scan() {
-			x, err := strconv.Atoi(scanner.Text())
-			if err != nil {
-				log.Printf("error converting bytearray to signature")
-				return
-			}
-			signature[index] = append(signature[index], uint8(x))
-		}
-		index++
-	}
-
-	index = 0
-	total_verified := 0
-	publicKey := strings.Split(string(th), "\n")
-	for _, l := range publicKey {
-		pub.h = []int16{}
-		bb := strings.NewReader(l)
-		scanner1 := bufio.NewScanner(bb)
-		scanner1.Split(bufio.ScanWords)
-		for scanner1.Scan() {
-			x, err := strconv.Atoi(scanner1.Text())
-			if err != nil {
-				log.Printf("error converting bytearray to signature")
-				return
-			}
-			pub.h = append(pub.h, int16(x))
-		}
-
-		for i := 0; i < 10; i++ {
-			var signThis []uint8
-			signThis = message[i]
-
-			verification := pub.Verify([]byte(signThis), []byte(signature[index*10+i]))
-			if verification == false {
-				log.Printf("Error verifying signature")
-				return
-			} else {
-				log.Printf("Verification OK")
-				total_verified++
-			}
-		}
-
-		if total_verified == 100 {
-			log.Print("Verification Successful!")
-			return
-		}
-		index++
-	}
 }
