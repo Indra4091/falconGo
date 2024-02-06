@@ -500,7 +500,11 @@ func Verify(pubkey []int16, message []byte, signature []byte) bool {
 
 //////////////////////////////////////////////////////////////////////////////
 
-func VerifyBytes(inputBytes [1722]byte) bool {
+func VerifyBytes(inputBytes []byte) bool {
+	if len(inputBytes) != 1722 {
+		return false
+	}
+
 	var pubkey []int16
 	var message []byte
 	var signature []byte
