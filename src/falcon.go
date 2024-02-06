@@ -497,3 +497,86 @@ func Verify(pubkey []int16, message []byte, signature []byte) bool {
 	}
 	return true
 }
+
+//////////////////////////////////////////////////////////////////////////////
+
+func VerifyBytes(inputBytes [1722]byte) bool {
+	var pubkey []int16
+	var message []byte
+	var signature []byte
+
+	j := 0
+
+	for i := 0; i < 1024; i++ {
+		var temp int16
+		temp = int16(inputBytes[i]) << 8
+		temp += int16(inputBytes[i+1])
+		i += 1
+
+		pubkey = append(pubkey, temp)
+	}
+
+	j = 1024
+
+	for i := 0; i < 32; i++ {
+		message = append(message, inputBytes[j+i])
+	}
+
+	j = 1024 + 32
+
+	for i := 0; i < 666; i++ {
+		signature = append(signature, inputBytes[i+j])
+	}
+
+	n := 512
+
+	salt := signature[HeadLen : HeadLen+SaltLen]
+	encS := signature[HeadLen+SaltLen:]
+
+	PubParam := GetParamSet(uint16(n))
+
+	var normSign uint32
+	normSign = 0
+	//var ng uint32
+	//ng = 0
+
+	var s1 []int16
+	// ss1 is dummy-array
+	ss1, err := internal.Decompress(encS, int(PubParam.sigbytelen-HeadLen-SaltLen), int(n))
+
+	/*fmt.Println("\nsigPart s1: ", ss1)*/
+
+	if err != nil {
+		fmt.Println("invalid encoding")
+		return false
+	}
+
+	for i := 0; i < len(ss1); i++ {
+		s1 = append(s1, int16(ss1[i]))
+	}
+
+	// compute s0 and normalize its coefficients in (-q/2, q/2]
+	hashed := hashToPoint(message, salt)
+	s0 := ntt.SubZq(hashed, ntt.MulZq(s1, pubkey))
+	//fmt.Println("\nQ: ", util.Q)
+
+	for i := 0; i < len(s0); i++ {
+		s0[i] = int16((s0[i]+(util.Q>>1))%util.Q - (util.Q >> 1))
+	}
+
+	for _, v := range s0 {
+		normSign += uint32(v) * uint32(v)
+	}
+	//fmt.Println("\ns0 sum: ", normSign)
+	for _, v := range s1 {
+		normSign += uint32(v) * uint32(v)
+	}
+
+	fmt.Println("\nsignature bound: ", PubParam.sigbound)
+	fmt.Println("normSign: ", normSign)
+
+	if normSign > PubParam.sigbound {
+		return false
+	}
+	return true
+}
