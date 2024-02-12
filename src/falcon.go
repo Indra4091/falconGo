@@ -505,74 +505,64 @@ func VerifyBytes(inputBytes []byte) bool {
 		return false
 	}
 
-	var pubkey []int16
+	var h []int16
 	var message []byte
 	var signature []byte
 
 	j := 0
-
 	for i := 0; i < 1024; i++ {
 		var temp int16
 		temp = int16(inputBytes[i]) << 8
 		temp += int16(inputBytes[i+1])
 		i += 1
 
-		pubkey = append(pubkey, temp)
+		h = append(h, temp)
 	}
 
 	j = 1024
-
 	for i := 0; i < 32; i++ {
 		message = append(message, inputBytes[j+i])
 	}
 
 	j = 1024 + 32
-
 	for i := 0; i < 666; i++ {
 		signature = append(signature, inputBytes[i+j])
 	}
 
 	n := 512
-
-	salt := signature[HeadLen : HeadLen+SaltLen]
-	encS := signature[HeadLen+SaltLen:]
+	r := signature[HeadLen : HeadLen+SaltLen]
+	s := signature[HeadLen+SaltLen:]
 
 	PubParam := GetParamSet(uint16(n))
 
 	var normSign uint32
 	normSign = 0
-	//var ng uint32
-	//ng = 0
 
-	var s1 []int16
-	// ss1 is dummy-array
-	ss1, err := internal.Decompress(encS, int(PubParam.sigbytelen-HeadLen-SaltLen), int(n))
-
-	/*fmt.Println("\nsigPart s1: ", ss1)*/
+	var s2 []int16
+	// s2_temp is dummy-array
+	s2_temp, err := internal.Decompress(s, int(PubParam.sigbytelen-HeadLen-SaltLen), int(n))
 
 	if err != nil {
 		fmt.Println("invalid encoding")
 		return false
 	}
 
-	for i := 0; i < len(ss1); i++ {
-		s1 = append(s1, int16(ss1[i]))
+	for i := 0; i < len(s2_temp); i++ {
+		s2 = append(s2, int16(s2_temp[i]))
 	}
 
-	// compute s0 and normalize its coefficients in (-q/2, q/2]
-	hashed := hashToPoint(message, salt)
-	s0 := ntt.SubZq(hashed, ntt.MulZq(s1, pubkey))
-	//fmt.Println("\nQ: ", util.Q)
+	// compute s1 and normalize its coefficients in (-q/2, q/2]
+	c := hashToPoint(message, r)
+	s1 := ntt.SubZq(c, ntt.MulZq(s2, h))
 
-	for i := 0; i < len(s0); i++ {
-		s0[i] = int16((s0[i]+(util.Q>>1))%util.Q - (util.Q >> 1))
+	for i := 0; i < len(s1); i++ {
+		s1[i] = int16((s1[i]+(util.Q>>1))%util.Q - (util.Q >> 1))
 	}
 
-	for _, v := range s0 {
+	for _, v := range s1 {
 		normSign += uint32(v) * uint32(v)
 	}
-	//fmt.Println("\ns0 sum: ", normSign)
-	for _, v := range s1 {
+	for _, v := range s2 {
 		normSign += uint32(v) * uint32(v)
 	}
 
