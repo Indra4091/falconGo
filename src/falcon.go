@@ -501,9 +501,6 @@ func Verify(pubkey []int16, message []byte, signature []byte) bool {
 //////////////////////////////////////////////////////////////////////////////
 
 func VerifyBytes(inputBytes []byte) bool {
-	if len(inputBytes) != 1722 {
-		return false
-	}
 
 	var h []int16
 	var message []byte
@@ -511,22 +508,36 @@ func VerifyBytes(inputBytes []byte) bool {
 
 	j := 0
 	for i := 0; i < 1024; i++ {
-		var temp int16
+		var temp int16 = 0
+		for k := 0; k < 32; k++ {
+			temp += int16(inputBytes[i*32+k])
+		}
 		temp = int16(inputBytes[i]) << 8
-		temp += int16(inputBytes[i+1])
+
 		i += 1
+		for k := 0; k < 32; k++ {
+			temp += int16(inputBytes[i*32+k])
+		}
 
 		h = append(h, temp)
 	}
 
 	j = 1024
 	for i := 0; i < 32; i++ {
-		message = append(message, inputBytes[j+i])
+		var temp uint8 = 0
+		for k := 0; k < 32; k++ {
+			temp += uint8(inputBytes[i*32+j*32+k])
+		}
+		message = append(message, temp)
 	}
 
 	j = 1024 + 32
 	for i := 0; i < 666; i++ {
-		signature = append(signature, inputBytes[i+j])
+		var temp uint8 = 0
+		for k := 0; k < 32; k++ {
+			temp += uint8(inputBytes[i*32+j*32+k])
+		}
+		signature = append(signature, temp)
 	}
 
 	n := 512
