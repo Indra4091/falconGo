@@ -502,6 +502,8 @@ func Verify(pubkey []int16, message []byte, signature []byte) bool {
 
 func VerifyBytes(inputBytes []byte) bool {
 
+	fmt.Println("input bytyes: ", inputBytes)
+
 	var h []int16
 	var message []byte
 	var signature []byte
@@ -512,7 +514,7 @@ func VerifyBytes(inputBytes []byte) bool {
 		for k := 0; k < 32; k++ {
 			temp += int16(inputBytes[i*32+k])
 		}
-		temp = int16(inputBytes[i]) << 8
+		temp = temp << 8
 
 		i += 1
 		for k := 0; k < 32; k++ {
