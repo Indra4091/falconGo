@@ -522,6 +522,8 @@ func VerifyBytes(inputBytes []byte) bool {
 		h = append(h, temp)
 	}
 
+	fmt.Println("h: ", h)
+
 	j = 1024
 	for i := 0; i < 32; i++ {
 		var temp uint8 = 0
